@@ -79,3 +79,72 @@ export const userSchools = mysqlTable("userSchools", {
 
 export type UserSchool = typeof userSchools.$inferSelect;
 export type InsertUserSchool = typeof userSchools.$inferInsert;
+
+/**
+ * Professores da plataforma
+ */
+export const teachers = mysqlTable("teachers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  schoolId: int("schoolId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  subject: varchar("subject", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Teacher = typeof teachers.$inferSelect;
+export type InsertTeacher = typeof teachers.$inferInsert;
+
+/**
+ * Alunos da plataforma
+ */
+export const students = mysqlTable("students", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
+  schoolId: int("schoolId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 20 }),
+  dateOfBirth: varchar("dateOfBirth", { length: 10 }),
+  grade: varchar("grade", { length: 50 }),
+  status: mysqlEnum("status", ["ativo", "inativo", "transferido"]).default("ativo").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Student = typeof students.$inferSelect;
+export type InsertStudent = typeof students.$inferInsert;
+
+/**
+ * Responsáveis (pais/guardiões) dos alunos
+ */
+export const guardians = mysqlTable("guardians", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
+  schoolId: int("schoolId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  relationship: varchar("relationship", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Guardian = typeof guardians.$inferSelect;
+export type InsertGuardian = typeof guardians.$inferInsert;
+
+/**
+ * Associação entre alunos e responsáveis
+ */
+export const studentGuardians = mysqlTable("studentGuardians", {
+  id: int("id").autoincrement().primaryKey(),
+  studentId: int("studentId").notNull(),
+  guardianId: int("guardianId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StudentGuardian = typeof studentGuardians.$inferSelect;
+export type InsertStudentGuardian = typeof studentGuardians.$inferInsert;

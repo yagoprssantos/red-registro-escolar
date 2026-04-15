@@ -5,9 +5,11 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { createContact, getContacts, createSchool, getSchoolByEmail, getUserSchools, createUserSchool, getSchoolContacts } from "./db";
 import { TRPCError } from "@trpc/server";
+import { profilesRouter } from "./profiles";
 
 export const appRouter = router({
   system: systemRouter,
+  profiles: profilesRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

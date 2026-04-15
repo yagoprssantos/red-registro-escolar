@@ -7,8 +7,12 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 
-const Login = lazy(() => import('./pages/Login'));
+const ProfileSelector = lazy(() => import('./pages/ProfileSelector'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
+const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const GuardianDashboard = lazy(() => import('./pages/GuardianDashboard'));
 
 function LoadingFallback() {
   return (
@@ -25,14 +29,34 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/profile-selector"}>
+        <Suspense fallback={<LoadingFallback />}>
+          <ProfileSelector />
+        </Suspense>
+      </Route>
       <Route path={"/login"}>
         <Suspense fallback={<LoadingFallback />}>
-          <Login />
+          <LoginPage />
         </Suspense>
       </Route>
       <Route path={"/dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
           <Dashboard />
+        </Suspense>
+      </Route>
+      <Route path={"/teacher-dashboard"}>
+        <Suspense fallback={<LoadingFallback />}>
+          <TeacherDashboard />
+        </Suspense>
+      </Route>
+      <Route path={"/student-dashboard"}>
+        <Suspense fallback={<LoadingFallback />}>
+          <StudentDashboard />
+        </Suspense>
+      </Route>
+      <Route path={"/guardian-dashboard"}>
+        <Suspense fallback={<LoadingFallback />}>
+          <GuardianDashboard />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
