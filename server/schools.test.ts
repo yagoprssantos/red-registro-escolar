@@ -137,7 +137,30 @@ describe("schools router", () => {
     });
 
     it("returns empty array for user with no schools", async () => {
-      const ctx = createAuthenticatedContext();
+      // Create a new user without any schools
+      const newUser: User = {
+        id: 999,
+        openId: "new-user-no-schools",
+        email: "newuser@example.com",
+        name: "New User",
+        loginMethod: "manus",
+        role: "user",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      };
+
+      const ctx: TrpcContext = {
+        user: newUser,
+        req: {
+          protocol: "https",
+          headers: {},
+        } as TrpcContext["req"],
+        res: {
+          clearCookie: () => {},
+        } as TrpcContext["res"],
+      };
+
       const caller = appRouter.createCaller(ctx);
 
       const schools = await caller.schools.mySchools();

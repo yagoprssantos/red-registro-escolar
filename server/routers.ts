@@ -3,7 +3,8 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { createContact, getContacts, createSchool, getSchoolByEmail, getUserSchools, createUserSchool, getSchoolContacts } from "./db";
+import { createContact, getContacts, createSchool, getSchoolByEmail, getUserSchools, createUserSchool, getSchoolContacts, getDb } from "./db";
+import { schools as schoolsTable } from "../drizzle/schema";
 import { TRPCError } from "@trpc/server";
 import { profilesRouter } from "./profiles";
 
@@ -108,6 +109,19 @@ export const appRouter = router({
         }
       }),
 
+    list: publicProcedure
+      .query(async () => {
+        try {
+          const db = await getDb();
+          if (!db) return [];
+          const schools = await db.select().from(schoolsTable).limit(100);
+          return schools;
+        } catch (error) {
+          console.error("Failed to fetch schools:", error);
+          return [];
+        }
+      }),
+
     mySchools: protectedProcedure
       .query(async ({ ctx }) => {
         try {
@@ -156,6 +170,78 @@ export const appRouter = router({
           console.error("Failed to fetch school contacts:", error);
           if (error instanceof TRPCError) throw error;
           throw new Error("Falha ao carregar contatos");
+        }
+      }),
+  }),
+
+  onboarding: router({
+    complete: protectedProcedure
+      .input(z.object({
+        personalData: z.object({
+          name: z.string().min(1),
+          email: z.string().email(),
+          phone: z.string().min(1),
+        }),
+        schoolData: z.object({
+          schoolId: z.number().optional(),
+          schoolName: z.string().optional(),
+          schoolCity: z.string().optional(),
+          isNewSchool: z.boolean(),
+        }),
+        professionalData: z.object({
+          subject: z.string().optional(),
+          position: z.enum(["teacher", "admin", "guardian"]),
+          grade: z.string().optional(),
+        }),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          if (!ctx.user) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "Usuário não autenticado",
+            });
+          }
+
+          let schoolId: number;
+
+          // Se for nova escola, criar
+          if (input.schoolData.isNewSchool) {
+            const newSchool = await createSchool({
+              name: input.schoolData.schoolName || "Sem Nome",
+              email: `school-${Date.now()}@red.local`,
+              city: input.schoolData.schoolCity || null,
+              phone: null,
+              address: null,
+              state: null,
+              zipCode: null,
+              studentCount: null,
+              status: "trial",
+            });
+            if (!newSchool) {
+              throw new Error("Falha ao criar escola");
+            }
+            schoolId = newSchool.id;
+          } else {
+            schoolId = input.schoolData.schoolId || 0;
+          }
+
+          // Vincular usuário à escola
+          if (schoolId) {
+            await createUserSchool({
+              userId: ctx.user.id,
+              schoolId: schoolId,
+            });
+          }
+
+          return {
+            success: true,
+            message: "Onboarding concluído com sucesso",
+          };
+        } catch (error) {
+          console.error("Failed to complete onboarding:", error);
+          if (error instanceof TRPCError) throw error;
+          throw new Error("Falha ao completar onboarding. Tente novamente.");
         }
       }),
   }),

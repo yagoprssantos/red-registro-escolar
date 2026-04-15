@@ -26,3 +26,14 @@
 - [x] Criar botão de login bem aparente na landing page
 - [x] Adicionar botão flutuante de login
 - [x] Melhorar visibilidade do CTA de login
+
+## Onboarding Pós-Login
+- [x] Criar página de onboarding com wizard de múltiplos passos
+- [x] Implementar passo 1: Dados pessoais (nome, email, telefone)
+- [x] Implementar passo 2: Seleção de escola ou criação de nova escola
+- [x] Implementar passo 3: Dados profissionais (disciplina, turmas, etc)
+- [x] Implementar passo 4: Confirmação e finalização
+- [x] Criar routers backend para salvar dados de onboarding
+- [x] Adicionar validação de formulários com feedback visual
+- [x] Criar testes para fluxo de onboarding
+- [x] Integrar onboarding ao fluxo de autenticação

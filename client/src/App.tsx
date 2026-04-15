@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const GuardianDashboard = lazy(() => import('./pages/GuardianDashboard'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
 
 function LoadingFallback() {
   return (
@@ -57,6 +58,11 @@ function Router() {
       <Route path={"/guardian-dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
           <GuardianDashboard />
+        </Suspense>
+      </Route>
+      <Route path={"/onboarding"}>
+        <Suspense fallback={<LoadingFallback />}>
+          <Onboarding />
         </Suspense>
       </Route>
       <Route path={"/404"} component={NotFound} />
