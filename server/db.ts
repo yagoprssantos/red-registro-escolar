@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, contacts, InsertContact, Contact } from "../drizzle/schema";
+import { InsertUser, users, contacts, InsertContact, Contact, schools, InsertSchool, School, userSchools, InsertUserSchool, UserSchool } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -120,6 +120,101 @@ export async function getContacts(limit: number = 50, offset: number = 0) {
     return await db.select().from(contacts).limit(limit).offset(offset);
   } catch (error) {
     console.error("[Database] Failed to get contacts:", error);
+    throw error;
+  }
+}
+
+export async function createSchool(school: InsertSchool): Promise<School | null> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot create school: database not available");
+    return null;
+  }
+
+  try {
+    const result = await db.insert(schools).values(school);
+    const id = result[0]?.insertId;
+    if (!id) return null;
+    
+    const created = await db.select().from(schools).where(eq(schools.id, id as number)).limit(1);
+    return created.length > 0 ? created[0] : null;
+  } catch (error) {
+    console.error("[Database] Failed to create school:", error);
+    throw error;
+  }
+}
+
+export async function getSchoolByEmail(email: string): Promise<School | undefined> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get school: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.select().from(schools).where(eq(schools.email, email)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to get school by email:", error);
+    throw error;
+  }
+}
+
+export async function getUserSchools(userId: number): Promise<(UserSchool & { school: School })[]> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user schools: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db
+      .select()
+      .from(userSchools)
+      .innerJoin(schools, eq(userSchools.schoolId, schools.id))
+      .where(eq(userSchools.userId, userId));
+    
+    return result.map(row => ({
+      ...row.userSchools,
+      school: row.schools,
+    }));
+  } catch (error) {
+    console.error("[Database] Failed to get user schools:", error);
+    throw error;
+  }
+}
+
+export async function createUserSchool(userSchool: InsertUserSchool): Promise<UserSchool | null> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot create user school: database not available");
+    return null;
+  }
+
+  try {
+    const result = await db.insert(userSchools).values(userSchool);
+    const id = result[0]?.insertId;
+    if (!id) return null;
+    
+    const created = await db.select().from(userSchools).where(eq(userSchools.id, id as number)).limit(1);
+    return created.length > 0 ? created[0] : null;
+  } catch (error) {
+    console.error("[Database] Failed to create user school:", error);
+    throw error;
+  }
+}
+
+export async function getSchoolContacts(schoolId: number): Promise<Contact[]> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get school contacts: database not available");
+    return [];
+  }
+
+  try {
+    return await db.select().from(contacts).where(eq(contacts.schoolId, schoolId)).limit(100);
+  } catch (error) {
+    console.error("[Database] Failed to get school contacts:", error);
     throw error;
   }
 }

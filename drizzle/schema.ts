@@ -30,6 +30,7 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const contacts = mysqlTable("contacts", {
   id: int("id").autoincrement().primaryKey(),
+  schoolId: int("schoolId"),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   school: varchar("school", { length: 255 }).notNull(),
@@ -43,3 +44,38 @@ export const contacts = mysqlTable("contacts", {
 
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContact = typeof contacts.$inferInsert;
+
+/**
+ * Escolas cadastradas na plataforma
+ */
+export const schools = mysqlTable("schools", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  phone: varchar("phone", { length: 20 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 2 }),
+  zipCode: varchar("zipCode", { length: 10 }),
+  studentCount: int("studentCount"),
+  status: mysqlEnum("status", ["ativo", "inativo", "trial"]).default("trial").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type School = typeof schools.$inferSelect;
+export type InsertSchool = typeof schools.$inferInsert;
+
+/**
+ * Associação entre usuários e escolas (um usuário pode gerenciar múltiplas escolas)
+ */
+export const userSchools = mysqlTable("userSchools", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  schoolId: int("schoolId").notNull(),
+  role: mysqlEnum("role", ["admin", "director", "coordinator", "teacher"]).default("coordinator").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type UserSchool = typeof userSchools.$inferSelect;
+export type InsertUserSchool = typeof userSchools.$inferInsert;
