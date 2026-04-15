@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogIn } from "lucide-react";
 
 const navLinks = [
   { label: "Início", href: "#inicio" },
@@ -72,12 +72,22 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* CTA Button */}
+        {/* CTA Buttons */}
         <div className="hidden lg:flex items-center gap-3">
+          {/* Login Button - Prominent */}
+          <a
+            href="/profile-selector"
+            className="font-heading font-semibold text-sm px-6 py-2.5 bg-red-brand text-white rounded-lg hover:bg-[#6b0d19] transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 flex items-center gap-2 group"
+          >
+            <LogIn size={18} className="group-hover:rotate-12 transition-transform" />
+            <span>Acessar Plataforma</span>
+          </a>
+          
+          {/* Demo Button */}
           <a
             href="#contato"
             onClick={(e) => { e.preventDefault(); handleNavClick("#contato"); }}
-            className="font-heading font-semibold text-sm px-5 py-2.5 bg-red-brand text-white rounded-sm hover:bg-[#6b0d19] transition-colors duration-200 shadow-sm hover:shadow-md"
+            className="font-heading font-semibold text-sm px-5 py-2.5 border-2 border-red-brand text-red-brand rounded-lg hover:bg-red-brand hover:text-white transition-colors duration-200"
           >
             Solicitar Demo
           </a>
@@ -107,10 +117,21 @@ export default function Navbar() {
                 {link.label}
               </a>
             ))}
+            
+            {/* Mobile Login Button - Prominent */}
+            <a
+              href="/profile-selector"
+              className="mt-3 font-heading font-semibold text-sm px-5 py-3 bg-red-brand text-white rounded-lg text-center hover:bg-[#6b0d19] transition-colors w-full flex items-center justify-center gap-2 shadow-md"
+            >
+              <LogIn size={18} />
+              <span>Acessar Plataforma</span>
+            </a>
+            
+            {/* Mobile Demo Button */}
             <a
               href="#contato"
               onClick={(e) => { e.preventDefault(); handleNavClick("#contato"); }}
-              className="mt-2 font-heading font-semibold text-sm px-5 py-3 bg-red-brand text-white rounded-sm text-center hover:bg-[#6b0d19] transition-colors"
+              className="mt-2 font-heading font-semibold text-sm px-5 py-3 border-2 border-red-brand text-red-brand rounded-lg text-center hover:bg-red-brand hover:text-white transition-colors w-full"
             >
               Solicitar Demo
             </a>

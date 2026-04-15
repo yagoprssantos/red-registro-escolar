@@ -14,11 +14,13 @@ import CtaBanner from "@/components/CtaBanner";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
+import FloatingLoginButton from "@/components/FloatingLoginButton";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
+      <FloatingLoginButton />
       <HeroSection />
       <FeaturesSection />
       <HowItWorksSection />

@@ -21,3 +21,8 @@
 - [x] Implementar routers específicos para cada perfil
 - [x] Criar testes para todos os perfis
 - [x] Validar fluxo completo com todos os perfis
+
+## Melhorias de UX
+- [x] Criar botão de login bem aparente na landing page
+- [x] Adicionar botão flutuante de login
+- [x] Melhorar visibilidade do CTA de login

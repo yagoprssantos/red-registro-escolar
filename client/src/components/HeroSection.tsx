@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, LogIn } from "lucide-react";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-hero-bg-GcCe4zBbNkWen9uhqXJpPm.webp";
 
@@ -114,24 +114,36 @@ export default function HeroSection() {
               visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           >
+            {/* Primary CTA - Login Button */}
+            <a
+              href="/profile-selector"
+              className="inline-flex items-center gap-2 bg-white text-red-brand font-heading font-semibold text-sm px-8 py-3.5 rounded-lg hover:bg-gray-50 transition-all duration-200 shadow-lg hover:shadow-2xl hover:scale-105 group"
+            >
+              <LogIn size={18} className="group-hover:rotate-12 transition-transform" />
+              <span>Acessar Plataforma</span>
+            </a>
+            
+            {/* Secondary CTA - Demo */}
             <a
               href="#contato"
               onClick={(e) => {
                 e.preventDefault();
                 document.querySelector("#contato")?.scrollIntoView({ behavior: "smooth" });
               }}
-              className="inline-flex items-center gap-2 bg-white text-red-brand font-heading font-semibold text-sm px-7 py-3.5 rounded-sm hover:bg-gray-50 transition-all duration-200 shadow-lg hover:shadow-xl group"
+              className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border-2 border-white/60 text-white font-heading font-semibold text-sm px-7 py-3.5 rounded-lg hover:bg-white/25 transition-all duration-200"
             >
               Solicitar Demonstração
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </a>
+            
+            {/* Tertiary CTA - Features */}
             <a
               href="#funcionalidades"
               onClick={(e) => {
                 e.preventDefault();
                 document.querySelector("#funcionalidades")?.scrollIntoView({ behavior: "smooth" });
               }}
-              className="inline-flex items-center gap-2 border-2 border-white/60 text-white font-heading font-semibold text-sm px-7 py-3.5 rounded-sm hover:bg-white/10 transition-all duration-200"
+              className="inline-flex items-center gap-2 border-2 border-white/60 text-white font-heading font-semibold text-sm px-7 py-3.5 rounded-lg hover:bg-white/10 transition-all duration-200"
             >
               Conhecer Funcionalidades
             </a>
@@ -151,7 +163,7 @@ export default function HeroSection() {
           ].map((stat) => (
             <div
               key={stat.label}
-              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-sm p-4 text-center"
+              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 text-center"
             >
               <div className="font-condensed font-bold text-3xl lg:text-4xl text-white">
                 {stat.value.toLocaleString("pt-BR")}
