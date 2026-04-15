@@ -97,7 +97,7 @@ export default function ContactSection() {
                 {
                   icon: Phone,
                   label: "Telefone",
-                  value: "(11) 3000-0000",
+                  value: "(XX) 3000-0000",
                   href: "tel:+551130000000",
                 },
                 {
@@ -109,7 +109,7 @@ export default function ContactSection() {
                 {
                   icon: MapPin,
                   label: "Endereço",
-                  value: "São Paulo, SP — Brasil",
+                  value: "Fortaleza, CE — Brasil",
                   href: "#",
                 },
               ].map((item) => {
