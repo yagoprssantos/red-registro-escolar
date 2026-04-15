@@ -1,19 +1,38 @@
 /*
  * GuardianDashboard — RED Registro Escolar Digital
- * Dashboard para responsáveis (pais/guardiões)
+ * Dashboard para responsáveis com dados reais
  */
 
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, TrendingUp, AlertCircle, MessageSquare, Calendar } from "lucide-react";
+import { LogOut, User, TrendingUp, AlertCircle, MessageSquare, Calendar, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 export default function GuardianDashboard() {
   const { user, logout, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+
+  // Buscar dados do responsável
+  const { data: guardianData, isLoading: isLoadingGuardian } = trpc.profiles.guardian.me.useQuery(
+    undefined,
+    { enabled: isAuthenticated && !loading }
+  );
+
+  // Buscar filhos/alunos do responsável
+  const { data: students = [], isLoading: isLoadingStudents } = trpc.profiles.guardian.students.useQuery(
+    undefined,
+    { enabled: isAuthenticated && !loading }
+  );
+
+  // Buscar desempenho do aluno selecionado
+  const { data: performance, isLoading: isLoadingPerformance } = trpc.profiles.guardian.studentPerformance.useQuery(
+    { studentId: selectedStudentId || 1 },
+    { enabled: isAuthenticated && !loading && selectedStudentId !== null }
+  );
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -31,12 +50,19 @@ export default function GuardianDashboard() {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  if (loading) {
+  useEffect(() => {
+    if (students && students.length > 0 && selectedStudentId === null) {
+      const firstStudent = students[0] as any;
+      setSelectedStudentId(firstStudent?.id || 1);
+    }
+  }, [students, selectedStudentId]);
+
+  if (loading || isLoadingGuardian) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-body text-gray-600">Carregando...</p>
+          <Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
+          <p className="font-body text-gray-600">Carregando dados...</p>
         </div>
       </div>
     );
@@ -96,95 +122,123 @@ export default function GuardianDashboard() {
             <User size={20} className="text-purple-600" />
             Meus Filhos
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { nome: "João Silva", serie: "6º Ano A", media: "8.5" },
-              { nome: "Maria Silva", serie: "8º Ano B", media: "9.0" },
-            ].map(filho => (
-              <div key={filho.nome} className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-600">
-                <p className="font-heading font-semibold text-gray-900 mb-2">{filho.nome}</p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-body text-sm text-gray-600">{filho.serie}</p>
+          {isLoadingStudents ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 text-purple-600 animate-spin mr-2" />
+              <span className="font-body text-gray-600">Carregando filhos...</span>
+            </div>
+          ) : students.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(students || []).map((filho: any) => (
+                <button
+                  key={filho.id}
+                  onClick={() => setSelectedStudentId(filho.id)}
+                  className={`bg-white rounded-lg shadow-sm p-6 border-l-4 transition-all ${
+                    selectedStudentId === filho.id
+                      ? "border-purple-600 bg-purple-50"
+                      : "border-gray-200 hover:border-purple-600"
+                  }`}
+                >
+                  <p className="font-heading font-semibold text-gray-900 mb-2 text-left">{filho.name}</p>
+                  <div className="flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="font-body text-sm text-gray-600">{filho.grade}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-body text-xs text-gray-500 uppercase tracking-wider">Média</p>
+                      <p className="font-display text-2xl font-bold text-purple-600">{filho.averageGrade?.toFixed(1) || "-"}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-body text-xs text-gray-500 uppercase tracking-wider">Média</p>
-                    <p className="font-display text-2xl font-bold text-purple-600">{filho.media}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-white rounded-lg">
+              <p className="font-body text-gray-600">Nenhum filho cadastrado</p>
+            </div>
+          )}
         </div>
 
         {/* Main Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Desempenho */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-6">
-            <h3 className="font-heading font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <TrendingUp size={20} className="text-purple-600" />
-              Desempenho - João Silva
-            </h3>
-            <div className="space-y-4">
-              {[
-                { materia: "Matemática", nota: "8.5", progresso: 85 },
-                { materia: "Português", nota: "9.0", progresso: 90 },
-                { materia: "Ciências", nota: "7.8", progresso: 78 },
-                { materia: "História", nota: "8.2", progresso: 82 },
-              ].map(item => (
-                <div key={item.materia}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-body font-medium text-gray-900">{item.materia}</p>
-                    <p className="font-body text-sm font-semibold text-purple-600">{item.nota}</p>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${item.progresso}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Alertas e Comunicados */}
-          <div className="space-y-6">
-            {/* Alertas */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+        {selectedStudentId && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Desempenho */}
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-6">
               <h3 className="font-heading font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <AlertCircle size={20} className="text-orange-600" />
-                Alertas
+                <TrendingUp size={20} className="text-purple-600" />
+                Desempenho Acadêmico
               </h3>
-              <div className="space-y-2">
-                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                  <p className="font-body text-sm text-orange-900">
-                    <strong>Faltas:</strong> 2 faltas não justificadas
-                  </p>
+              {isLoadingPerformance ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-purple-600 animate-spin mr-2" />
+                  <span className="font-body text-gray-600">Carregando desempenho...</span>
+                </div>
+              ) : performance?.grades && performance.grades.length > 0 ? (
+                <div className="space-y-4">
+                  {performance.grades.map((item: any, idx: number) => (
+                    <div key={idx}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-body font-medium text-gray-900">{item.subject}</p>
+                        <p className="font-body text-sm font-semibold text-purple-600">{item.grade}</p>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${(item.grade / 10) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="font-body text-gray-600">Nenhuma nota registrada ainda</p>
+                </div>
+              )}
+            </div>
+
+            {/* Alertas e Eventos */}
+            <div className="space-y-6">
+              {/* Alertas */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h3 className="font-heading font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <AlertCircle size={20} className="text-orange-600" />
+                  Alertas
+                </h3>
+                {performance?.alerts && performance.alerts.length > 0 ? (
+                  <div className="space-y-2">
+                    {performance.alerts.map((alert: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <p className="font-body text-sm text-orange-900">{alert}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="font-body text-sm text-gray-600">Nenhum alerta no momento</p>
+                )}
+              </div>
+
+              {/* Próximos Eventos */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h3 className="font-heading font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Calendar size={20} className="text-blue-600" />
+                  Próximos Eventos
+                </h3>
+                <div className="space-y-2">
+                  {[
+                    "Reunião de pais - 20/04",
+                    "Prova de Matemática - 18/04",
+                    "Festa da escola - 25/04",
+                  ].map(evento => (
+                    <p key={evento} className="font-body text-sm text-gray-600">
+                      • {evento}
+                    </p>
+                  ))}
                 </div>
               </div>
             </div>
-
-            {/* Próximos Eventos */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="font-heading font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar size={20} className="text-blue-600" />
-                Próximos Eventos
-              </h3>
-              <div className="space-y-2">
-                {[
-                  "Reunião de pais - 20/04",
-                  "Prova de Matemática - 18/04",
-                  "Festa da escola - 25/04",
-                ].map(evento => (
-                  <p key={evento} className="font-body text-sm text-gray-600">
-                    • {evento}
-                  </p>
-                ))}
-              </div>
-            </div>
           </div>
-        </div>
+        )}
 
         {/* Comunicação */}
         <div className="mt-8 bg-white rounded-lg shadow-sm p-6">

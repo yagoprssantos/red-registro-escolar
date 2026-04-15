@@ -18,6 +18,6 @@
 - [x] Criar dashboard para professores com turmas e alunos
 - [x] Criar dashboard para alunos com notas e atividades
 - [x] Criar dashboard para responsáveis com acompanhamento do aluno
-- [ ] Implementar routers específicos para cada perfil
-- [ ] Criar testes para todos os perfis
-- [ ] Validar fluxo completo com todos os perfis
+- [x] Implementar routers específicos para cada perfil
+- [x] Criar testes para todos os perfis
+- [x] Validar fluxo completo com todos os perfis

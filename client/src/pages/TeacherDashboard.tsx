@@ -1,19 +1,31 @@
 /*
  * TeacherDashboard — RED Registro Escolar Digital
- * Dashboard para professores
+ * Dashboard para professores com dados reais
  */
 
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, Users, BookOpen, BarChart3, MessageSquare } from "lucide-react";
+import { LogOut, Users, BookOpen, BarChart3, MessageSquare, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 export default function TeacherDashboard() {
   const { user, logout, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
+
+  // Buscar dados do professor
+  const { data: teacherData, isLoading: isLoadingTeacher } = trpc.profiles.teacher.me.useQuery(
+    undefined,
+    { enabled: isAuthenticated && !loading }
+  );
+
+  // Buscar turmas do professor
+  const { data: classes = [], isLoading: isLoadingClasses } = trpc.profiles.teacher.classes.useQuery(
+    undefined,
+    { enabled: isAuthenticated && !loading }
+  );
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -31,12 +43,12 @@ export default function TeacherDashboard() {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  if (loading) {
+  if (loading || isLoadingTeacher) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-body text-gray-600">Carregando...</p>
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="font-body text-gray-600">Carregando dados...</p>
         </div>
       </div>
     );
@@ -45,6 +57,8 @@ export default function TeacherDashboard() {
   if (!isAuthenticated) {
     return null;
   }
+
+  const totalStudents = classes.reduce((sum, c) => sum + (c.students || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -64,7 +78,7 @@ export default function TeacherDashboard() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="font-body text-sm font-medium text-gray-900">{user?.name}</p>
-              <p className="font-body text-xs text-gray-500">Professor</p>
+              <p className="font-body text-xs text-gray-500">{teacherData?.subject}</p>
             </div>
             <button
               onClick={() => logoutMutation.mutate()}
@@ -93,8 +107,8 @@ export default function TeacherDashboard() {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: Users, label: "Turmas", value: "3", color: "bg-blue-100 text-blue-600" },
-            { icon: BookOpen, label: "Alunos", value: "87", color: "bg-green-100 text-green-600" },
+            { icon: Users, label: "Turmas", value: classes.length.toString(), color: "bg-blue-100 text-blue-600" },
+            { icon: BookOpen, label: "Alunos", value: totalStudents.toString(), color: "bg-green-100 text-green-600" },
             { icon: MessageSquare, label: "Mensagens", value: "12", color: "bg-purple-100 text-purple-600" },
             { icon: BarChart3, label: "Avaliações", value: "24", color: "bg-orange-100 text-orange-600" },
           ].map(stat => {
@@ -121,14 +135,25 @@ export default function TeacherDashboard() {
               <Users size={20} className="text-blue-600" />
               Minhas Turmas
             </h3>
-            <div className="space-y-3">
-              {["6º Ano A", "6º Ano B", "7º Ano A"].map(turma => (
-                <div key={turma} className="border border-gray-200 rounded-lg p-4 hover:border-blue-600 transition-colors cursor-pointer">
-                  <p className="font-heading font-medium text-gray-900">{turma}</p>
-                  <p className="font-body text-sm text-gray-600">28 alunos • Matemática</p>
-                </div>
-              ))}
-            </div>
+            {isLoadingClasses ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-blue-600 animate-spin mr-2" />
+                <span className="font-body text-gray-600">Carregando turmas...</span>
+              </div>
+            ) : classes.length > 0 ? (
+              <div className="space-y-3">
+                {classes.map(turma => (
+                  <div key={turma.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-600 transition-colors cursor-pointer">
+                    <p className="font-heading font-medium text-gray-900">{turma.name}</p>
+                    <p className="font-body text-sm text-gray-600">{turma.students} alunos • {turma.subject}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="font-body text-gray-600">Nenhuma turma encontrada</p>
+              </div>
+            )}
           </div>
 
           {/* Atalhos */}

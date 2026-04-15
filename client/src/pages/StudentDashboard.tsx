@@ -1,19 +1,31 @@
 /*
  * StudentDashboard — RED Registro Escolar Digital
- * Dashboard para alunos
+ * Dashboard para alunos com dados reais
  */
 
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, BookOpen, Award, Calendar, MessageSquare, TrendingUp } from "lucide-react";
+import { LogOut, BookOpen, Award, Calendar, MessageSquare, TrendingUp, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 export default function StudentDashboard() {
   const { user, logout, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
+
+  // Buscar dados do aluno
+  const { data: studentData, isLoading: isLoadingStudent } = trpc.profiles.student.me.useQuery(
+    undefined,
+    { enabled: isAuthenticated && !loading }
+  );
+
+  // Buscar notas do aluno
+  const { data: grades = [], isLoading: isLoadingGrades } = trpc.profiles.student.grades.useQuery(
+    undefined,
+    { enabled: isAuthenticated && !loading }
+  );
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -31,12 +43,12 @@ export default function StudentDashboard() {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  if (loading) {
+  if (loading || isLoadingStudent) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-body text-gray-600">Carregando...</p>
+          <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+          <p className="font-body text-gray-600">Carregando dados...</p>
         </div>
       </div>
     );
@@ -64,7 +76,7 @@ export default function StudentDashboard() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="font-body text-sm font-medium text-gray-900">{user?.name}</p>
-              <p className="font-body text-xs text-gray-500">6º Ano A</p>
+              <p className="font-body text-xs text-gray-500">{studentData?.grade}</p>
             </div>
             <button
               onClick={() => logoutMutation.mutate()}
@@ -93,10 +105,10 @@ export default function StudentDashboard() {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: Award, label: "Média", value: "8.5", color: "bg-green-100 text-green-600" },
-            { icon: BookOpen, label: "Atividades", value: "12", color: "bg-blue-100 text-blue-600" },
+            { icon: Award, label: "Média", value: studentData?.averageGrade?.toFixed(1) || "-", color: "bg-green-100 text-green-600" },
+            { icon: BookOpen, label: "Atividades", value: grades.length.toString(), color: "bg-blue-100 text-blue-600" },
             { icon: TrendingUp, label: "Progresso", value: "85%", color: "bg-purple-100 text-purple-600" },
-            { icon: Calendar, label: "Faltas", value: "2", color: "bg-orange-100 text-orange-600" },
+            { icon: Calendar, label: "Faltas", value: (studentData?.absences || 0).toString(), color: "bg-orange-100 text-orange-600" },
           ].map(stat => {
             const Icon = stat.icon;
             return (
@@ -121,25 +133,32 @@ export default function StudentDashboard() {
               <Award size={20} className="text-green-600" />
               Notas Recentes
             </h3>
-            <div className="space-y-3">
-              {[
-                { materia: "Matemática", nota: "8.5", data: "15 de abril" },
-                { materia: "Português", nota: "9.0", data: "14 de abril" },
-                { materia: "Ciências", nota: "7.8", data: "12 de abril" },
-              ].map(item => (
-                <div key={item.materia} className="border border-gray-200 rounded-lg p-4 hover:border-green-600 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-heading font-medium text-gray-900">{item.materia}</p>
-                      <p className="font-body text-sm text-gray-600">{item.data}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-display text-2xl font-bold text-green-600">{item.nota}</p>
+            {isLoadingGrades ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-green-600 animate-spin mr-2" />
+                <span className="font-body text-gray-600">Carregando notas...</span>
+              </div>
+            ) : grades.length > 0 ? (
+              <div className="space-y-3">
+                {grades.map((item: any, idx: number) => (
+                  <div key={idx} className="border border-gray-200 rounded-lg p-4 hover:border-green-600 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-heading font-medium text-gray-900">{item.subject}</p>
+                        <p className="font-body text-sm text-gray-600">{new Date(item.date).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display text-2xl font-bold text-green-600">{item.grade}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="font-body text-gray-600">Nenhuma nota registrada ainda</p>
+              </div>
+            )}
           </div>
 
           {/* Comunicados */}
