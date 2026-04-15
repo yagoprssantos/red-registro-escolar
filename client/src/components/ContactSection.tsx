@@ -1,11 +1,13 @@
 /*
  * ContactSection — RED Registro Escolar Digital
  * Design: Fundo vermelho com formulário branco, layout assimétrico
- * Formulário de contato com validação básica
+ * Formulário de contato integrado com tRPC e banco de dados
  */
 
 import { useState, useRef, useEffect } from "react";
 import { Mail, Phone, MapPin, Send, CheckCircle } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 export default function ContactSection() {
   const [form, setForm] = useState({
@@ -34,9 +36,25 @@ export default function ContactSection() {
     return () => observer.disconnect();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const createContactMutation = trpc.contacts.create.useMutation();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    try {
+      await createContactMutation.mutateAsync({
+        name: form.name,
+        email: form.email,
+        school: form.school,
+        role: form.role,
+        students: form.students || undefined,
+        message: form.message || undefined,
+      });
+      setSubmitted(true);
+      toast.success("Mensagem enviada com sucesso! Entraremos em contato em breve.");
+    } catch (error) {
+      toast.error("Erro ao enviar mensagem. Tente novamente.");
+      console.error(error);
+    }
   };
 
   return (
@@ -152,7 +170,10 @@ export default function ContactSection() {
                     Obrigado pelo interesse no RED. Nossa equipe entrará em contato em até 24 horas úteis para agendar sua demonstração.
                   </p>
                   <button
-                    onClick={() => { setSubmitted(false); setForm({ name: "", email: "", school: "", role: "", students: "", message: "" }); }}
+                    onClick={() => {
+                      setSubmitted(false);
+                      setForm({ name: "", email: "", school: "", role: "", students: "", message: "" });
+                    }}
                     className="mt-6 font-heading font-semibold text-sm text-red-brand hover:underline"
                   >
                     Enviar outra mensagem
@@ -259,10 +280,20 @@ export default function ContactSection() {
 
                     <button
                       type="submit"
-                      className="w-full flex items-center justify-center gap-2 bg-red-brand text-white font-heading font-semibold text-sm py-3.5 rounded-sm hover:bg-[#6b0d19] transition-colors duration-200 shadow-sm hover:shadow-md mt-1"
+                      disabled={createContactMutation.isPending}
+                      className="w-full flex items-center justify-center gap-2 bg-red-brand text-white font-heading font-semibold text-sm py-3.5 rounded-sm hover:bg-[#6b0d19] disabled:bg-gray-400 transition-colors duration-200 shadow-sm hover:shadow-md mt-1"
                     >
-                      <Send size={16} />
-                      Solicitar Demonstração Gratuita
+                      {createContactMutation.isPending ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Send size={16} />
+                          Solicitar Demonstração Gratuita
+                        </>
+                      )}
                     </button>
 
                     <p className="font-body text-xs text-gray-400 text-center">
