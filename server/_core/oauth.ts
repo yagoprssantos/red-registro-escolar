@@ -4,12 +4,105 @@ import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
+const profileToDashboard: Record<string, string> = {
+  school: "/dashboard",
+  teacher: "/teacher-dashboard",
+  student: "/student-dashboard",
+  guardian: "/guardian-dashboard",
+};
+
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
   return typeof value === "string" ? value : undefined;
 }
 
+function parseSafeReturnPath(input: string | undefined): string | null {
+  if (!input) return null;
+  if (!input.startsWith("/")) return null;
+  if (input.startsWith("//")) return null;
+  return input;
+}
+
+function decodeReturnPathFromState(state: string): string | null {
+  try {
+    const decoded = atob(state);
+    const decodedUrl = new URL(decoded, "http://localhost");
+    const returnPath = decodedUrl.searchParams.get("returnPath") ?? undefined;
+    return parseSafeReturnPath(returnPath);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getBodyString(req: Request, key: string): string | undefined {
+  const value = (req.body as Record<string, unknown> | undefined)?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function getLoginFieldsFromBody(req: Request): Record<string, string> {
+  const value = (req.body as Record<string, unknown> | undefined)?.loginFields;
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[0] === "string" && typeof entry[1] === "string"
+    )
+  );
+}
+
 export function registerOAuthRoutes(app: Express) {
+  app.post("/api/auth/demo-login", async (req: Request, res: Response) => {
+    const requestedProfile = getBodyString(req, "profile") ?? "school";
+    const profile = profileToDashboard[requestedProfile]
+      ? requestedProfile
+      : "school";
+    const requestedReturnPath = getBodyString(req, "returnPath");
+    const safeReturnPath =
+      parseSafeReturnPath(requestedReturnPath) ??
+      `${profileToDashboard[profile]}?profile=${profile}&mode=demo`;
+
+    const loginFields = getLoginFieldsFromBody(req);
+    const emailField = Object.keys(loginFields).find(key =>
+      key.includes("Email")
+    );
+    const fallbackEmail = emailField ? loginFields[emailField] : undefined;
+    const now = Date.now();
+    const openId = `demo-${profile}-${now}`;
+    const displayName = `Demo ${profile.charAt(0).toUpperCase() + profile.slice(1)}`;
+
+    try {
+      await db.upsertUser({
+        openId,
+        name: displayName,
+        email: fallbackEmail ?? null,
+        loginMethod: "demo",
+        lastSignedIn: new Date(),
+      });
+
+      const sessionToken = await sdk.createSessionToken(openId, {
+        name: displayName,
+        expiresInMs: ONE_YEAR_MS,
+      });
+
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, {
+        ...cookieOptions,
+        maxAge: ONE_YEAR_MS,
+      });
+
+      res.status(200).json({
+        success: true,
+        redirectTo: safeReturnPath,
+      });
+    } catch (error) {
+      console.error("[Auth] Demo login failed", error);
+      res.status(500).json({ error: "demo login failed" });
+    }
+  });
+
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");
@@ -42,9 +135,13 @@ export function registerOAuthRoutes(app: Express) {
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, sessionToken, {
+        ...cookieOptions,
+        maxAge: ONE_YEAR_MS,
+      });
 
-      res.redirect(302, "/");
+      const returnPath = decodeReturnPathFromState(state) ?? "/";
+      res.redirect(302, returnPath);
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });

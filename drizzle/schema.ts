@@ -1,4 +1,11 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -11,7 +18,7 @@ export const users = mysqlTable("users", {
    * Use this for relations between tables.
    */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+  /** OAuth identifier (openId) returned from the callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -37,7 +44,9 @@ export const contacts = mysqlTable("contacts", {
   role: varchar("role", { length: 100 }).notNull(),
   students: varchar("students", { length: 50 }),
   message: text("message"),
-  status: mysqlEnum("status", ["novo", "respondido", "descartado"]).default("novo").notNull(),
+  status: mysqlEnum("status", ["novo", "respondido", "descartado"])
+    .default("novo")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -58,7 +67,9 @@ export const schools = mysqlTable("schools", {
   state: varchar("state", { length: 2 }),
   zipCode: varchar("zipCode", { length: 10 }),
   studentCount: int("studentCount"),
-  status: mysqlEnum("status", ["ativo", "inativo", "trial"]).default("trial").notNull(),
+  status: mysqlEnum("status", ["ativo", "inativo", "trial"])
+    .default("trial")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -73,7 +84,9 @@ export const userSchools = mysqlTable("userSchools", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   schoolId: int("schoolId").notNull(),
-  role: mysqlEnum("role", ["admin", "director", "coordinator", "teacher"]).default("coordinator").notNull(),
+  role: mysqlEnum("role", ["admin", "director", "coordinator", "teacher"])
+    .default("coordinator")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -110,7 +123,9 @@ export const students = mysqlTable("students", {
   phone: varchar("phone", { length: 20 }),
   dateOfBirth: varchar("dateOfBirth", { length: 10 }),
   grade: varchar("grade", { length: 50 }),
-  status: mysqlEnum("status", ["ativo", "inativo", "transferido"]).default("ativo").notNull(),
+  status: mysqlEnum("status", ["ativo", "inativo", "transferido"])
+    .default("ativo")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

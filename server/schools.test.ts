@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { appRouter } from "./routers";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
@@ -25,7 +25,7 @@ function createAuthenticatedContext(userId: number = 1): TrpcContext {
     openId: `user-${userId}`,
     email: `user${userId}@example.com`,
     name: `User ${userId}`,
-    loginMethod: "manus",
+    loginMethod: "oauth",
     role: "user",
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -143,7 +143,7 @@ describe("schools router", () => {
         openId: "new-user-no-schools",
         email: "newuser@example.com",
         name: "New User",
-        loginMethod: "manus",
+        loginMethod: "oauth",
         role: "user",
         createdAt: new Date(),
         updatedAt: new Date(),

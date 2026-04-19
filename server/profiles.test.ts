@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { appRouter } from "./routers";
-import type { TrpcContext } from "./_core/context";
 import type { User } from "../drizzle/schema";
+import type { TrpcContext } from "./_core/context";
+import { appRouter } from "./routers";
 
 type AuthenticatedUser = User;
 
@@ -23,7 +23,7 @@ const mockUser: AuthenticatedUser = {
   openId: "test-user",
   email: "test@example.com",
   name: "Test User",
-  loginMethod: "manus",
+  loginMethod: "oauth",
   role: "user",
   createdAt: new Date(),
   updatedAt: new Date(),
