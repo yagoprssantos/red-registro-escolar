@@ -12,8 +12,8 @@
       "destination": "https://red-registro-escolar.onrender.com/api/:path*"
     },
     {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "source": "/(.*)",
+      "destination": "/"
     }
   ]
 }
