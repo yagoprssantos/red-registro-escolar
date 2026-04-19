@@ -3,15 +3,20 @@
  * Wizard de múltiplos passos para preenchimento de dados pós-login
  */
 
-import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 type OnboardingStep = "personal" | "school" | "professional" | "confirmation";
 
@@ -37,7 +42,7 @@ interface ProfessionalData {
 export default function Onboarding() {
   const { user, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
-  
+
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("personal");
   const [personalData, setPersonalData] = useState<PersonalData>({
     name: user?.name || "",
@@ -61,7 +66,7 @@ export default function Onboarding() {
       toast.success("Onboarding concluído com sucesso!");
       navigate("/profile-selector");
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(error.message || "Erro ao salvar dados");
     },
   });
@@ -106,10 +111,16 @@ export default function Onboarding() {
   const validateProfessionalData = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (professionalData.position === "teacher" && !professionalData.subject?.trim()) {
+    if (
+      professionalData.position === "teacher" &&
+      !professionalData.subject?.trim()
+    ) {
       newErrors.subject = "Disciplina é obrigatória";
     }
-    if (professionalData.position === "guardian" && !professionalData.grade?.trim()) {
+    if (
+      professionalData.position === "guardian" &&
+      !professionalData.grade?.trim()
+    ) {
       newErrors.grade = "Série do aluno é obrigatória";
     }
 
@@ -159,7 +170,7 @@ export default function Onboarding() {
       <div className="min-h-screen bg-gradient-to-br from-red-brand/5 to-blue-dark/5 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-red-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-body text-gray-600">Carregando...</p>
+          <p className="font-body text-muted-foreground">Carregando...</p>
         </div>
       </div>
     );
@@ -177,10 +188,10 @@ export default function Onboarding() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-red-brand rounded-lg mb-4">
             <span className="font-display text-xl font-bold text-white">R</span>
           </div>
-          <h1 className="font-display text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="font-display text-3xl font-bold text-foreground mb-2">
             Bem-vindo ao RED!
           </h1>
-          <p className="font-body text-gray-600">
+          <p className="font-body text-muted-foreground">
             Vamos configurar sua conta em alguns passos simples
           </p>
         </div>
@@ -188,64 +199,99 @@ export default function Onboarding() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            {["personal", "school", "professional", "confirmation"].map((step, idx) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-heading font-semibold text-sm transition-all ${
-                    step === currentStep
-                      ? "bg-red-brand text-white scale-110"
-                      : ["personal", "school", "professional", "confirmation"].indexOf(step) <
-                        ["personal", "school", "professional", "confirmation"].indexOf(currentStep)
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  {["personal", "school", "professional", "confirmation"].indexOf(step) <
-                  ["personal", "school", "professional", "confirmation"].indexOf(currentStep) ? (
-                    <CheckCircle2 size={20} />
-                  ) : (
-                    idx + 1
+            {["personal", "school", "professional", "confirmation"].map(
+              (step, idx) => (
+                <div key={step} className="flex items-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-heading font-semibold text-sm transition-all ${
+                      step === currentStep
+                        ? "bg-red-brand text-white scale-110"
+                        : [
+                              "personal",
+                              "school",
+                              "professional",
+                              "confirmation",
+                            ].indexOf(step) <
+                            [
+                              "personal",
+                              "school",
+                              "professional",
+                              "confirmation",
+                            ].indexOf(currentStep)
+                          ? "bg-green-500 text-white"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {[
+                      "personal",
+                      "school",
+                      "professional",
+                      "confirmation",
+                    ].indexOf(step) <
+                    [
+                      "personal",
+                      "school",
+                      "professional",
+                      "confirmation",
+                    ].indexOf(currentStep) ? (
+                      <CheckCircle2 size={20} />
+                    ) : (
+                      idx + 1
+                    )}
+                  </div>
+                  {idx < 3 && (
+                    <div
+                      className={`w-12 h-1 mx-2 rounded-full transition-all ${
+                        [
+                          "personal",
+                          "school",
+                          "professional",
+                          "confirmation",
+                        ].indexOf(step) <
+                        [
+                          "personal",
+                          "school",
+                          "professional",
+                          "confirmation",
+                        ].indexOf(currentStep)
+                          ? "bg-green-500"
+                          : "bg-muted"
+                      }`}
+                    />
                   )}
                 </div>
-                {idx < 3 && (
-                  <div
-                    className={`w-12 h-1 mx-2 rounded-full transition-all ${
-                      ["personal", "school", "professional", "confirmation"].indexOf(step) <
-                      ["personal", "school", "professional", "confirmation"].indexOf(currentStep)
-                        ? "bg-green-500"
-                        : "bg-gray-200"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+              )
+            )}
           </div>
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-card rounded-lg shadow-lg p-8">
           {/* Step 1: Personal Data */}
           {currentStep === "personal" && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-heading text-2xl font-semibold text-gray-900 mb-2">
+                <h2 className="font-heading text-2xl font-semibold text-foreground mb-2">
                   Dados Pessoais
                 </h2>
-                <p className="font-body text-gray-600">
+                <p className="font-body text-muted-foreground">
                   Confirme e atualize suas informações pessoais
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="name" className="font-body font-medium text-gray-900">
+                  <Label
+                    htmlFor="name"
+                    className="font-body font-medium text-foreground"
+                  >
                     Nome Completo
                   </Label>
                   <Input
                     id="name"
                     type="text"
                     value={personalData.name}
-                    onChange={(e) =>
+                    onChange={e =>
                       setPersonalData({ ...personalData, name: e.target.value })
                     }
                     className={errors.name ? "border-red-500" : ""}
@@ -259,15 +305,21 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <Label htmlFor="email" className="font-body font-medium text-gray-900">
+                  <Label
+                    htmlFor="email"
+                    className="font-body font-medium text-foreground"
+                  >
                     Email
                   </Label>
                   <Input
                     id="email"
                     type="email"
                     value={personalData.email}
-                    onChange={(e) =>
-                      setPersonalData({ ...personalData, email: e.target.value })
+                    onChange={e =>
+                      setPersonalData({
+                        ...personalData,
+                        email: e.target.value,
+                      })
                     }
                     className={errors.email ? "border-red-500" : ""}
                     placeholder="seu.email@exemplo.com"
@@ -280,15 +332,21 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <Label htmlFor="phone" className="font-body font-medium text-gray-900">
+                  <Label
+                    htmlFor="phone"
+                    className="font-body font-medium text-foreground"
+                  >
                     Telefone
                   </Label>
                   <Input
                     id="phone"
                     type="tel"
                     value={personalData.phone}
-                    onChange={(e) =>
-                      setPersonalData({ ...personalData, phone: e.target.value })
+                    onChange={e =>
+                      setPersonalData({
+                        ...personalData,
+                        phone: e.target.value,
+                      })
                     }
                     className={errors.phone ? "border-red-500" : ""}
                     placeholder="(11) 99999-9999"
@@ -307,10 +365,10 @@ export default function Onboarding() {
           {currentStep === "school" && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-heading text-2xl font-semibold text-gray-900 mb-2">
+                <h2 className="font-heading text-2xl font-semibold text-foreground mb-2">
                   Vinculação à Escola
                 </h2>
-                <p className="font-body text-gray-600">
+                <p className="font-body text-muted-foreground">
                   Selecione sua escola ou crie uma nova
                 </p>
               </div>
@@ -318,33 +376,37 @@ export default function Onboarding() {
               <div className="space-y-4">
                 <div className="flex gap-4">
                   <button
-                    onClick={() => setSchoolData({ ...schoolData, isNewSchool: false })}
+                    onClick={() =>
+                      setSchoolData({ ...schoolData, isNewSchool: false })
+                    }
                     className={`flex-1 p-4 border-2 rounded-lg transition-all ${
                       !schoolData.isNewSchool
                         ? "border-red-brand bg-red-brand/5"
-                        : "border-gray-200 hover:border-red-brand"
+                        : "border-border hover:border-red-brand"
                     }`}
                   >
-                    <p className="font-heading font-semibold text-gray-900">
+                    <p className="font-heading font-semibold text-foreground">
                       Escola Existente
                     </p>
-                    <p className="font-body text-xs text-gray-600">
+                    <p className="font-body text-xs text-muted-foreground">
                       Selecione de nossas escolas parceiras
                     </p>
                   </button>
 
                   <button
-                    onClick={() => setSchoolData({ ...schoolData, isNewSchool: true })}
+                    onClick={() =>
+                      setSchoolData({ ...schoolData, isNewSchool: true })
+                    }
                     className={`flex-1 p-4 border-2 rounded-lg transition-all ${
                       schoolData.isNewSchool
                         ? "border-red-brand bg-red-brand/5"
-                        : "border-gray-200 hover:border-red-brand"
+                        : "border-border hover:border-red-brand"
                     }`}
                   >
-                    <p className="font-heading font-semibold text-gray-900">
+                    <p className="font-heading font-semibold text-foreground">
                       Criar Nova Escola
                     </p>
-                    <p className="font-body text-xs text-gray-600">
+                    <p className="font-body text-xs text-muted-foreground">
                       Registre sua instituição
                     </p>
                   </button>
@@ -352,19 +414,19 @@ export default function Onboarding() {
 
                 {!schoolData.isNewSchool ? (
                   <div>
-                    <Label className="font-body font-medium text-gray-900">
+                    <Label className="font-body font-medium text-foreground">
                       Selecione uma Escola
                     </Label>
                     <select
                       value={schoolData.schoolId || ""}
-                      onChange={(e) =>
+                      onChange={e =>
                         setSchoolData({
                           ...schoolData,
                           schoolId: parseInt(e.target.value),
                         })
                       }
                       className={`w-full px-4 py-2 border rounded-lg font-body ${
-                        errors.schoolId ? "border-red-500" : "border-gray-300"
+                        errors.schoolId ? "border-red-500" : "border-border"
                       }`}
                     >
                       <option value="">-- Selecione uma escola --</option>
@@ -383,14 +445,17 @@ export default function Onboarding() {
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="schoolName" className="font-body font-medium text-gray-900">
+                      <Label
+                        htmlFor="schoolName"
+                        className="font-body font-medium text-foreground"
+                      >
                         Nome da Escola
                       </Label>
                       <Input
                         id="schoolName"
                         type="text"
                         value={schoolData.schoolName || ""}
-                        onChange={(e) =>
+                        onChange={e =>
                           setSchoolData({
                             ...schoolData,
                             schoolName: e.target.value,
@@ -407,14 +472,17 @@ export default function Onboarding() {
                     </div>
 
                     <div>
-                      <Label htmlFor="schoolCity" className="font-body font-medium text-gray-900">
+                      <Label
+                        htmlFor="schoolCity"
+                        className="font-body font-medium text-foreground"
+                      >
                         Cidade
                       </Label>
                       <Input
                         id="schoolCity"
                         type="text"
                         value={schoolData.schoolCity || ""}
-                        onChange={(e) =>
+                        onChange={e =>
                           setSchoolData({
                             ...schoolData,
                             schoolCity: e.target.value,
@@ -439,17 +507,17 @@ export default function Onboarding() {
           {currentStep === "professional" && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-heading text-2xl font-semibold text-gray-900 mb-2">
+                <h2 className="font-heading text-2xl font-semibold text-foreground mb-2">
                   Dados Profissionais
                 </h2>
-                <p className="font-body text-gray-600">
+                <p className="font-body text-muted-foreground">
                   Informações sobre sua atuação na escola
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <Label className="font-body font-medium text-gray-900">
+                  <Label className="font-body font-medium text-foreground">
                     Qual é seu papel?
                   </Label>
                   <div className="grid grid-cols-3 gap-3 mt-2">
@@ -457,7 +525,7 @@ export default function Onboarding() {
                       { value: "teacher", label: "Professor" },
                       { value: "admin", label: "Administrador" },
                       { value: "guardian", label: "Responsável" },
-                    ].map((option) => (
+                    ].map(option => (
                       <button
                         key={option.value}
                         onClick={() =>
@@ -469,10 +537,10 @@ export default function Onboarding() {
                         className={`p-3 border-2 rounded-lg transition-all ${
                           professionalData.position === option.value
                             ? "border-red-brand bg-red-brand/5"
-                            : "border-gray-200 hover:border-red-brand"
+                            : "border-border hover:border-red-brand"
                         }`}
                       >
-                        <p className="font-body font-medium text-sm text-gray-900">
+                        <p className="font-body font-medium text-sm text-foreground">
                           {option.label}
                         </p>
                       </button>
@@ -482,14 +550,17 @@ export default function Onboarding() {
 
                 {professionalData.position === "teacher" && (
                   <div>
-                    <Label htmlFor="subject" className="font-body font-medium text-gray-900">
+                    <Label
+                      htmlFor="subject"
+                      className="font-body font-medium text-foreground"
+                    >
                       Disciplina
                     </Label>
                     <Input
                       id="subject"
                       type="text"
                       value={professionalData.subject || ""}
-                      onChange={(e) =>
+                      onChange={e =>
                         setProfessionalData({
                           ...professionalData,
                           subject: e.target.value,
@@ -508,14 +579,17 @@ export default function Onboarding() {
 
                 {professionalData.position === "guardian" && (
                   <div>
-                    <Label htmlFor="grade" className="font-body font-medium text-gray-900">
+                    <Label
+                      htmlFor="grade"
+                      className="font-body font-medium text-foreground"
+                    >
                       Série do Aluno
                     </Label>
                     <Input
                       id="grade"
                       type="text"
                       value={professionalData.grade || ""}
-                      onChange={(e) =>
+                      onChange={e =>
                         setProfessionalData({
                           ...professionalData,
                           grade: e.target.value,
@@ -539,66 +613,76 @@ export default function Onboarding() {
           {currentStep === "confirmation" && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-heading text-2xl font-semibold text-gray-900 mb-2">
+                <h2 className="font-heading text-2xl font-semibold text-foreground mb-2">
                   Confirme seus Dados
                 </h2>
-                <p className="font-body text-gray-600">
+                <p className="font-body text-muted-foreground">
                   Verifique as informações antes de finalizar
                 </p>
               </div>
 
-              <div className="space-y-4 bg-gray-50 rounded-lg p-6">
-                <div className="border-b border-gray-200 pb-4">
-                  <p className="font-body text-xs text-gray-500 uppercase tracking-wider mb-1">
+              <div className="space-y-4 bg-muted/40 rounded-lg p-6">
+                <div className="border-b border-border pb-4">
+                  <p className="font-body text-xs text-muted-foreground uppercase tracking-wider mb-1">
                     Dados Pessoais
                   </p>
-                  <p className="font-heading font-semibold text-gray-900">
+                  <p className="font-heading font-semibold text-foreground">
                     {personalData.name}
                   </p>
-                  <p className="font-body text-sm text-gray-600">{personalData.email}</p>
-                  <p className="font-body text-sm text-gray-600">{personalData.phone}</p>
+                  <p className="font-body text-sm text-muted-foreground">
+                    {personalData.email}
+                  </p>
+                  <p className="font-body text-sm text-muted-foreground">
+                    {personalData.phone}
+                  </p>
                 </div>
 
-                <div className="border-b border-gray-200 pb-4">
-                  <p className="font-body text-xs text-gray-500 uppercase tracking-wider mb-1">
+                <div className="border-b border-border pb-4">
+                  <p className="font-body text-xs text-muted-foreground uppercase tracking-wider mb-1">
                     Escola
                   </p>
-                  <p className="font-heading font-semibold text-gray-900">
+                  <p className="font-heading font-semibold text-foreground">
                     {schoolData.isNewSchool
                       ? schoolData.schoolName
-                      : schools.find((s: any) => s.id === schoolData.schoolId)?.name}
+                      : schools.find((s: any) => s.id === schoolData.schoolId)
+                          ?.name}
                   </p>
-                  <p className="font-body text-sm text-gray-600">
+                  <p className="font-body text-sm text-muted-foreground">
                     {schoolData.isNewSchool
                       ? schoolData.schoolCity
-                      : (schools.find((s: any) => s.id === schoolData.schoolId) as any)?.city}
+                      : (
+                          schools.find(
+                            (s: any) => s.id === schoolData.schoolId
+                          ) as any
+                        )?.city}
                   </p>
                 </div>
 
                 <div>
-                  <p className="font-body text-xs text-gray-500 uppercase tracking-wider mb-1">
+                  <p className="font-body text-xs text-muted-foreground uppercase tracking-wider mb-1">
                     Papel
                   </p>
-                  <p className="font-heading font-semibold text-gray-900">
+                  <p className="font-heading font-semibold text-foreground">
                     {professionalData.position === "teacher"
                       ? `Professor de ${professionalData.subject}`
                       : professionalData.position === "admin"
-                      ? "Administrador"
-                      : `Responsável - ${professionalData.grade}`}
+                        ? "Administrador"
+                        : `Responsável - ${professionalData.grade}`}
                   </p>
                 </div>
               </div>
 
               <div className="bg-blue-dark/5 border border-blue-dark/20 rounded-lg p-4">
                 <p className="font-body text-sm text-blue-dark">
-                  ✓ Seus dados serão salvos de forma segura e você poderá editá-los a qualquer momento em suas configurações.
+                  ✓ Seus dados serão salvos de forma segura e você poderá
+                  editá-los a qualquer momento em suas configurações.
                 </p>
               </div>
             </div>
           )}
 
           {/* Navigation Buttons */}
-          <div className="flex gap-4 mt-8 pt-8 border-t border-gray-200">
+          <div className="flex gap-4 mt-8 pt-8 border-t border-border">
             <Button
               onClick={handlePreviousStep}
               disabled={currentStep === "personal"}
@@ -612,7 +696,7 @@ export default function Onboarding() {
             {currentStep !== "confirmation" ? (
               <Button
                 onClick={handleNextStep}
-                className="ml-auto flex items-center gap-2 bg-red-brand hover:bg-[#6b0d19]"
+                className="ml-auto flex items-center gap-2 bg-red-brand hover:bg-red-brand-dark"
               >
                 Próximo
                 <ChevronRight size={16} />
@@ -623,7 +707,9 @@ export default function Onboarding() {
                 disabled={saveOnboardingMutation.isPending}
                 className="ml-auto flex items-center gap-2 bg-green-600 hover:bg-green-700"
               >
-                {saveOnboardingMutation.isPending ? "Finalizando..." : "Finalizar Onboarding"}
+                {saveOnboardingMutation.isPending
+                  ? "Finalizando..."
+                  : "Finalizar Onboarding"}
                 <CheckCircle2 size={16} />
               </Button>
             )}
