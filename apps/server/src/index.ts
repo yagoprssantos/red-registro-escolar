@@ -8,6 +8,9 @@ import { registerOAuthRoutes } from "./core/oauth";
 import { serveStatic, setupVite } from "./core/vite";
 import { appRouter } from "./routers";
 
+// Check if running in API-only mode (no frontend serving)
+const API_ONLY_MODE = process.env.API_ONLY_MODE === "true";
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -33,6 +36,21 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  
+  // CORS configuration for API-only mode (allow frontend from anywhere when separated)
+  if (API_ONLY_MODE) {
+    app.use((req, res, next) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+      if (req.method === "OPTIONS") {
+        res.sendStatus(200);
+      } else {
+        next();
+      }
+    });
+  }
+  
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
@@ -43,11 +61,13 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+  // development mode uses Vite, production mode uses static files (unless API-only)
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
-  } else {
+  } else if (!API_ONLY_MODE) {
     serveStatic(app);
+  } else {
+    console.log("[Server] Running in API-only mode (no frontend serving)");
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
