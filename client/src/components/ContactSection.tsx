@@ -4,9 +4,9 @@
  * Formulário de contato integrado com tRPC e banco de dados
  */
 
-import { useState, useRef, useEffect } from "react";
-import { Mail, Phone, MapPin, Send, CheckCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { CheckCircle, Mail, MapPin, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export default function ContactSection() {
@@ -50,7 +50,9 @@ export default function ContactSection() {
         message: form.message || undefined,
       });
       setSubmitted(true);
-      toast.success("Mensagem enviada com sucesso! Entraremos em contato em breve.");
+      toast.success(
+        "Mensagem enviada com sucesso! Entraremos em contato em breve."
+      );
     } catch (error) {
       toast.error("Erro ao enviar mensagem. Tente novamente.");
       console.error(error);
@@ -58,7 +60,11 @@ export default function ContactSection() {
   };
 
   return (
-    <section id="contato" className="py-24 bg-red-brand relative overflow-hidden" ref={ref}>
+    <section
+      id="contato"
+      className="py-24 bg-red-brand relative overflow-hidden"
+      ref={ref}
+    >
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-10">
         <div
@@ -78,7 +84,7 @@ export default function ContactSection() {
               visible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-8"
             }`}
           >
-            <div className="w-14 h-0.5 bg-white/40 mb-4" />
+            <div className="w-14 h-0.5 bg-card/40 mb-4" />
             <span className="font-condensed font-bold text-xs text-white/60 tracking-widest uppercase mb-3 block">
               Contato
             </span>
@@ -87,19 +93,13 @@ export default function ContactSection() {
               <span className="italic text-white/80">sua escola</span>
             </h2>
             <p className="font-body text-base text-white/80 leading-relaxed mb-10">
-              Agende uma demonstração gratuita e descubra como o RED pode transformar 
-              a gestão escolar da sua instituição. Nossa equipe está pronta para apresentar 
-              a plataforma e responder todas as suas dúvidas.
+              Entre em contato com nossa equipe para tirar dúvidas, solicitar
+              suporte ou explorar como o RED pode transformar a gestão escolar
+              da sua instituição. Estamos prontos para ajudar.
             </p>
 
             <div className="flex flex-col gap-5 mb-10">
               {[
-                {
-                  icon: Phone,
-                  label: "Telefone",
-                  value: "(XX) 3000-0000",
-                  href: "tel:+551130000000",
-                },
                 {
                   icon: Mail,
                   label: "E-mail",
@@ -112,7 +112,7 @@ export default function ContactSection() {
                   value: "Fortaleza, CE — Brasil",
                   href: "#",
                 },
-              ].map((item) => {
+              ].map(item => {
                 const Icon = item.icon;
                 return (
                   <a
@@ -120,7 +120,7 @@ export default function ContactSection() {
                     href={item.href}
                     className="flex items-center gap-4 group"
                   >
-                    <div className="w-10 h-10 rounded-sm bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition-colors">
+                    <div className="w-10 h-10 rounded-sm bg-card/15 flex items-center justify-center group-hover:bg-card/25 transition-colors">
                       <Icon size={18} className="text-white" />
                     </div>
                     <div>
@@ -138,16 +138,19 @@ export default function ContactSection() {
 
             {/* Trust badges */}
             <div className="flex flex-wrap gap-3">
-              {["LGPD Compliant", "ISO 27001", "Suporte 24h", "Dados no Brasil"].map(
-                (badge) => (
-                  <span
-                    key={badge}
-                    className="font-body text-xs text-white/80 border border-white/30 rounded-full px-3 py-1"
-                  >
-                    {badge}
-                  </span>
-                )
-              )}
+              {[
+                "LGPD Compliant",
+                "ISO 27001",
+                "Suporte 24h",
+                "Dados no Brasil",
+              ].map(badge => (
+                <span
+                  key={badge}
+                  className="font-body text-xs text-white/80 border border-white/30 rounded-full px-3 py-1"
+                >
+                  {badge}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -157,22 +160,30 @@ export default function ContactSection() {
               visible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
             }`}
           >
-            <div className="bg-white rounded-sm shadow-2xl p-8">
+            <div className="bg-card rounded-sm shadow-2xl p-8">
               {submitted ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-4">
                     <CheckCircle size={32} className="text-green-600" />
                   </div>
-                  <h3 className="font-display text-2xl font-bold text-gray-900 mb-2">
+                  <h3 className="font-display text-2xl font-bold text-foreground mb-2">
                     Mensagem Enviada!
                   </h3>
-                  <p className="font-body text-sm text-gray-600 leading-relaxed">
-                    Obrigado pelo interesse no RED. Nossa equipe entrará em contato em até 24 horas úteis para agendar sua demonstração.
+                  <p className="font-body text-sm text-muted-foreground leading-relaxed">
+                    Obrigado por entrar em contato. Nossa equipe responderá em
+                    até 24 horas úteis.
                   </p>
                   <button
                     onClick={() => {
                       setSubmitted(false);
-                      setForm({ name: "", email: "", school: "", role: "", students: "", message: "" });
+                      setForm({
+                        name: "",
+                        email: "",
+                        school: "",
+                        role: "",
+                        students: "",
+                        message: "",
+                      });
                     }}
                     className="mt-6 font-heading font-semibold text-sm text-red-brand hover:underline"
                   >
@@ -181,63 +192,71 @@ export default function ContactSection() {
                 </div>
               ) : (
                 <>
-                  <h3 className="font-heading font-bold text-gray-900 text-xl mb-6">
-                    Solicitar Demonstração Gratuita
+                  <h3 className="font-heading font-bold text-foreground text-xl mb-6">
+                    Entrar em Contato
                   </h3>
                   <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="font-body text-xs font-medium text-gray-700 block mb-1.5">
+                        <label className="font-body text-xs font-medium text-muted-foreground block mb-1.5">
                           Nome completo *
                         </label>
                         <input
                           type="text"
                           required
                           value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          onChange={e =>
+                            setForm({ ...form, name: e.target.value })
+                          }
                           placeholder="Seu nome"
-                          className="w-full font-body text-sm border border-gray-200 rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors"
+                          className="w-full font-body text-sm border border-border rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors"
                         />
                       </div>
                       <div>
-                        <label className="font-body text-xs font-medium text-gray-700 block mb-1.5">
+                        <label className="font-body text-xs font-medium text-muted-foreground block mb-1.5">
                           E-mail *
                         </label>
                         <input
                           type="email"
                           required
                           value={form.email}
-                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                          onChange={e =>
+                            setForm({ ...form, email: e.target.value })
+                          }
                           placeholder="seu@email.com"
-                          className="w-full font-body text-sm border border-gray-200 rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors"
+                          className="w-full font-body text-sm border border-border rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="font-body text-xs font-medium text-gray-700 block mb-1.5">
+                      <label className="font-body text-xs font-medium text-muted-foreground block mb-1.5">
                         Nome da escola *
                       </label>
                       <input
                         type="text"
                         required
                         value={form.school}
-                        onChange={(e) => setForm({ ...form, school: e.target.value })}
+                        onChange={e =>
+                          setForm({ ...form, school: e.target.value })
+                        }
                         placeholder="Nome da sua instituição"
-                        className="w-full font-body text-sm border border-gray-200 rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors"
+                        className="w-full font-body text-sm border border-border rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="font-body text-xs font-medium text-gray-700 block mb-1.5">
+                        <label className="font-body text-xs font-medium text-muted-foreground block mb-1.5">
                           Seu cargo *
                         </label>
                         <select
                           required
                           value={form.role}
-                          onChange={(e) => setForm({ ...form, role: e.target.value })}
-                          className="w-full font-body text-sm border border-gray-200 rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors bg-white"
+                          onChange={e =>
+                            setForm({ ...form, role: e.target.value })
+                          }
+                          className="w-full font-body text-sm border border-border rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors bg-card"
                         >
                           <option value="">Selecione</option>
                           <option value="diretor">Diretor(a)</option>
@@ -248,13 +267,15 @@ export default function ContactSection() {
                         </select>
                       </div>
                       <div>
-                        <label className="font-body text-xs font-medium text-gray-700 block mb-1.5">
+                        <label className="font-body text-xs font-medium text-muted-foreground block mb-1.5">
                           Nº de alunos
                         </label>
                         <select
                           value={form.students}
-                          onChange={(e) => setForm({ ...form, students: e.target.value })}
-                          className="w-full font-body text-sm border border-gray-200 rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors bg-white"
+                          onChange={e =>
+                            setForm({ ...form, students: e.target.value })
+                          }
+                          className="w-full font-body text-sm border border-border rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors bg-card"
                         >
                           <option value="">Selecione</option>
                           <option value="ate100">Até 100</option>
@@ -266,22 +287,24 @@ export default function ContactSection() {
                     </div>
 
                     <div>
-                      <label className="font-body text-xs font-medium text-gray-700 block mb-1.5">
+                      <label className="font-body text-xs font-medium text-muted-foreground block mb-1.5">
                         Mensagem
                       </label>
                       <textarea
                         rows={3}
                         value={form.message}
-                        onChange={(e) => setForm({ ...form, message: e.target.value })}
+                        onChange={e =>
+                          setForm({ ...form, message: e.target.value })
+                        }
                         placeholder="Conte-nos sobre sua escola e suas necessidades..."
-                        className="w-full font-body text-sm border border-gray-200 rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors resize-none"
+                        className="w-full font-body text-sm border border-border rounded-sm px-3.5 py-2.5 focus:outline-none focus:border-red-brand focus:ring-1 focus:ring-red-brand/20 transition-colors resize-none"
                       />
                     </div>
 
                     <button
                       type="submit"
                       disabled={createContactMutation.isPending}
-                      className="w-full flex items-center justify-center gap-2 bg-red-brand text-white font-heading font-semibold text-sm py-3.5 rounded-sm hover:bg-[#6b0d19] disabled:bg-gray-400 transition-colors duration-200 shadow-sm hover:shadow-md mt-1"
+                      className="w-full flex items-center justify-center gap-2 bg-red-brand text-white font-heading font-semibold text-sm py-3.5 rounded-sm hover:bg-red-brand-dark disabled:bg-muted disabled:text-muted-foreground transition-colors duration-200 shadow-sm hover:shadow-md mt-1"
                     >
                       {createContactMutation.isPending ? (
                         <>
@@ -291,12 +314,12 @@ export default function ContactSection() {
                       ) : (
                         <>
                           <Send size={16} />
-                          Solicitar Demonstração Gratuita
+                          Enviar Mensagem
                         </>
                       )}
                     </button>
 
-                    <p className="font-body text-xs text-gray-400 text-center">
+                    <p className="font-body text-xs text-muted-foreground text-center">
                       Ao enviar, você concorda com nossa{" "}
                       <span className="text-red-brand hover:underline cursor-pointer">
                         Política de Privacidade

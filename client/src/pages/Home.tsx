@@ -4,30 +4,24 @@
  * Composição de todas as seções da landing page
  */
 
-import Navbar from "@/components/Navbar";
-import HeroSection from "@/components/HeroSection";
-import FeaturesSection from "@/components/FeaturesSection";
-import HowItWorksSection from "@/components/HowItWorksSection";
-import DataSection from "@/components/DataSection";
 import BenefitsSection from "@/components/BenefitsSection";
-import CtaBanner from "@/components/CtaBanner";
-import TestimonialsSection from "@/components/TestimonialsSection";
 import ContactSection from "@/components/ContactSection";
+import CtaBanner from "@/components/CtaBanner";
+import FeaturesSection from "@/components/FeaturesSection";
+import FloatingThemeToggle from "@/components/FloatingThemeToggle";
 import Footer from "@/components/Footer";
-import FloatingLoginButton from "@/components/FloatingLoginButton";
+import HeroSection from "@/components/HeroSection";
+import Navbar from "@/components/Navbar";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
-      <FloatingLoginButton />
+    <div className="min-h-screen bg-background">
+      <Navbar showThemeToggle={false} showContactButton={false} />
+      <FloatingThemeToggle />
       <HeroSection />
       <FeaturesSection />
-      <HowItWorksSection />
-      <DataSection />
       <BenefitsSection />
       <CtaBanner />
-      <TestimonialsSection />
       <ContactSection />
       <Footer />
     </div>

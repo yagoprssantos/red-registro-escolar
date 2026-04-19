@@ -95,10 +95,10 @@ function StepItem({ step, index }: { step: (typeof steps)[0]; index: number }) {
             <span className="font-body text-xs font-medium text-red-brand tracking-widest uppercase block mb-2">
               {step.subtitle}
             </span>
-            <h3 className="font-display text-3xl lg:text-4xl font-bold text-gray-900 mb-4 leading-tight">
+            <h3 className="font-display text-3xl lg:text-4xl font-bold text-foreground mb-4 leading-tight">
               {step.title}
             </h3>
-            <p className="font-body text-base text-gray-600 leading-relaxed mb-6">
+            <p className="font-body text-base text-muted-foreground leading-relaxed mb-6">
               {step.description}
             </p>
             <ul className="flex flex-col gap-2.5">
@@ -107,7 +107,7 @@ function StepItem({ step, index }: { step: (typeof steps)[0]; index: number }) {
                   <span className="w-5 h-5 rounded-full bg-red-brand/10 flex items-center justify-center flex-shrink-0">
                     <span className="w-2 h-2 rounded-full bg-red-brand" />
                   </span>
-                  <span className="font-body text-sm text-gray-700">{point}</span>
+                  <span className="font-body text-sm text-muted-foreground">{point}</span>
                 </li>
               ))}
             </ul>
@@ -153,7 +153,7 @@ export default function HowItWorksSection() {
   }, []);
 
   return (
-    <section id="como-funciona" className="py-24 bg-white">
+    <section id="como-funciona" className="py-24 bg-card">
       <div className="container">
         {/* Header */}
         <div
@@ -166,11 +166,11 @@ export default function HowItWorksSection() {
           <span className="font-condensed font-bold text-xs text-red-brand tracking-widest uppercase mb-3 block">
             Como Funciona
           </span>
-          <h2 className="font-display text-4xl lg:text-5xl font-bold text-gray-900 mb-4 leading-tight">
+          <h2 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
             Do registro à{" "}
             <span className="italic text-red-brand">decisão pedagógica</span>
           </h2>
-          <p className="font-body text-base text-gray-600 leading-relaxed">
+          <p className="font-body text-base text-muted-foreground leading-relaxed">
             Em três etapas simples, sua escola passa a operar com mais eficiência, 
             transparência e conexão com as famílias.
           </p>

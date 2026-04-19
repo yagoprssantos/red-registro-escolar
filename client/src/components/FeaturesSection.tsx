@@ -4,18 +4,18 @@
  * Scroll reveal com stagger animation
  */
 
-import { useEffect, useRef, useState } from "react";
 import {
-  BookOpen,
-  Users,
-  MessageSquare,
-  BarChart3,
-  Calendar,
-  Shield,
-  Bell,
-  FileText,
   Award,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Calendar,
+  FileText,
+  MessageSquare,
+  Shield,
+  Users,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 const features = [
   {
@@ -112,20 +112,25 @@ function FeatureCard({
   return (
     <div
       ref={ref}
-      className={`group bg-white border border-gray-100 rounded-sm p-6 hover:shadow-lg transition-all duration-400 ${
-        feature.highlight ? "border-l-4 border-l-[#8b1120]" : "hover:border-l-4 hover:border-l-[#8b1120]"
+      className={`group relative overflow-hidden bg-card border border-border border-l-4 border-l-transparent rounded-sm p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-xl hover:border-l-red-brand ${
+        feature.highlight ? "shadow-sm" : ""
       } ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
-      style={{ transition: `opacity 0.5s ease ${index * 0.08}s, transform 0.5s ease ${index * 0.08}s, box-shadow 0.3s ease, border 0.3s ease` }}
+      style={{
+        transition: `opacity 0.5s ease ${index * 0.08}s, transform 0.5s ease ${index * 0.08}s, box-shadow 0.3s ease, border 0.3s ease`,
+      }}
     >
       <div className="flex items-start gap-4">
-        <div className="flex-shrink-0 w-11 h-11 rounded-sm bg-[#1f3a5f]/8 flex items-center justify-center group-hover:bg-[#8b1120]/10 transition-colors duration-300">
-          <Icon size={22} className="text-blue-brand group-hover:text-red-brand transition-colors duration-300" />
+        <div className="flex-shrink-0 w-11 h-11 rounded-sm bg-blue-brand/10 dark:bg-blue-brand-dark/60 flex items-center justify-center group-hover:bg-blue-brand/15 dark:group-hover:bg-blue-brand-dark transition-colors duration-300">
+          <Icon
+            size={22}
+            className="text-blue-brand dark:text-white transition-colors duration-300"
+          />
         </div>
         <div>
-          <h3 className="font-heading font-semibold text-gray-900 text-base mb-2 group-hover:text-red-brand transition-colors duration-200">
+          <h3 className="font-heading font-semibold text-foreground text-base mb-2 group-hover:text-red-brand transition-colors duration-200">
             {feature.title}
           </h3>
-          <p className="font-body text-sm text-gray-600 leading-relaxed">
+          <p className="font-body text-sm text-muted-foreground leading-relaxed">
             {feature.description}
           </p>
         </div>
@@ -153,26 +158,32 @@ export default function FeaturesSection() {
   }, []);
 
   return (
-    <section id="funcionalidades" className="py-24 bg-[#f9f6f2]">
+    <section
+      id="funcionalidades"
+      className="py-24 bg-background dark:bg-background relative overflow-hidden"
+    >
       <div className="container">
         {/* Header */}
         <div
           ref={titleRef}
           className={`max-w-2xl mb-16 transition-all duration-700 ${
-            titleVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            titleVisible
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-6"
           }`}
         >
           <div className="section-divider" />
           <span className="font-condensed font-bold text-xs text-red-brand tracking-widest uppercase mb-3 block">
             Funcionalidades
           </span>
-          <h2 className="font-display text-4xl lg:text-5xl font-bold text-gray-900 mb-4 leading-tight">
+          <h2 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
             Tudo que sua escola precisa{" "}
             <span className="italic text-red-brand">em um só lugar</span>
           </h2>
-          <p className="font-body text-base text-gray-600 leading-relaxed">
-            O RED integra todas as dimensões da vida escolar — do registro acadêmico à comunicação com as famílias — 
-            em uma plataforma intuitiva, segura e acessível de qualquer dispositivo.
+          <p className="font-body text-base text-muted-foreground leading-relaxed">
+            O RED integra todas as dimensões da vida escolar — do registro
+            acadêmico à comunicação com as famílias — em uma plataforma
+            intuitiva, segura e acessível de qualquer dispositivo.
           </p>
         </div>
 

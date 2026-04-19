@@ -4,8 +4,8 @@
  * Carrossel simples com indicadores
  */
 
-import { useEffect, useRef, useState } from "react";
 import { Quote } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 const testimonials = [
   {
@@ -33,7 +33,7 @@ const testimonials = [
     role: "Mãe de aluna do 7º ano",
     school: "Escola Particular Horizonte — Curitiba, PR",
     initials: "MC",
-    color: "bg-[#2a4f7c]",
+    color: "bg-blue-brand-light",
   },
   {
     quote:
@@ -67,7 +67,7 @@ export default function TestimonialsSection() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % testimonials.length);
+      setCurrent(prev => (prev + 1) % testimonials.length);
     }, 6000);
     return () => clearInterval(interval);
   }, []);
@@ -75,7 +75,7 @@ export default function TestimonialsSection() {
   const t = testimonials[current];
 
   return (
-    <section id="depoimentos" className="py-24 bg-[#f9f6f2]" ref={ref}>
+    <section id="depoimentos" className="py-24 bg-accent-light" ref={ref}>
       <div className="container">
         {/* Header */}
         <div
@@ -87,7 +87,7 @@ export default function TestimonialsSection() {
           <span className="font-condensed font-bold text-xs text-red-brand tracking-widest uppercase mb-3 block">
             Depoimentos
           </span>
-          <h2 className="font-display text-4xl lg:text-5xl font-bold text-gray-900 mb-4 leading-tight">
+          <h2 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
             O que dizem quem já{" "}
             <span className="italic text-red-brand">usa o RED</span>
           </h2>
@@ -99,7 +99,7 @@ export default function TestimonialsSection() {
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
         >
-          <div className="bg-white rounded-sm shadow-lg p-8 lg:p-12 max-w-4xl relative overflow-hidden">
+          <div className="bg-card rounded-sm shadow-lg p-8 lg:p-12 max-w-4xl relative overflow-hidden">
             {/* Quote icon */}
             <Quote
               size={80}
@@ -108,7 +108,7 @@ export default function TestimonialsSection() {
             />
 
             <div className="relative z-10">
-              <p className="font-display text-xl lg:text-2xl text-gray-800 leading-relaxed mb-8 italic">
+              <p className="font-display text-xl lg:text-2xl text-foreground leading-relaxed mb-8 italic">
                 "{t.quote}"
               </p>
 
@@ -121,13 +121,13 @@ export default function TestimonialsSection() {
                   </span>
                 </div>
                 <div>
-                  <div className="font-heading font-bold text-gray-900 text-base">
+                  <div className="font-heading font-bold text-foreground text-base">
                     {t.name}
                   </div>
                   <div className="font-body text-sm text-red-brand font-medium">
                     {t.role}
                   </div>
-                  <div className="font-body text-xs text-gray-500 mt-0.5">
+                  <div className="font-body text-xs text-muted-foreground mt-0.5">
                     {t.school}
                   </div>
                 </div>
@@ -160,8 +160,8 @@ export default function TestimonialsSection() {
               onClick={() => setCurrent(index)}
               className={`text-left p-4 rounded-sm border transition-all duration-300 ${
                 index === current
-                  ? "border-red-brand bg-white shadow-md"
-                  : "border-gray-200 bg-white/60 hover:bg-white hover:shadow-sm"
+                  ? "border-red-brand bg-card shadow-md"
+                  : "border-border bg-card/60 hover:bg-card hover:shadow-sm"
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
@@ -172,11 +172,11 @@ export default function TestimonialsSection() {
                     {t.initials}
                   </span>
                 </div>
-                <div className="font-heading font-semibold text-xs text-gray-800 leading-tight">
+                <div className="font-heading font-semibold text-xs text-foreground leading-tight">
                   {t.name.split(" ").slice(0, 2).join(" ")}
                 </div>
               </div>
-              <div className="font-body text-xs text-gray-500 leading-relaxed line-clamp-2">
+              <div className="font-body text-xs text-muted-foreground leading-relaxed line-clamp-2">
                 {t.role}
               </div>
             </button>

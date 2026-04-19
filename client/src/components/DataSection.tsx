@@ -52,7 +52,7 @@ export default function DataSection() {
   }, []);
 
   return (
-    <section className="py-24 bg-white" ref={ref}>
+    <section className="py-24 bg-card" ref={ref}>
       <div className="container">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Left: Text */}
@@ -65,11 +65,11 @@ export default function DataSection() {
             <span className="font-condensed font-bold text-xs text-red-brand tracking-widest uppercase mb-3 block">
               Inteligência de Dados
             </span>
-            <h2 className="font-display text-4xl lg:text-5xl font-bold text-gray-900 mb-5 leading-tight">
+            <h2 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-5 leading-tight">
               Decisões pedagógicas{" "}
               <span className="italic text-red-brand">baseadas em dados</span>
             </h2>
-            <p className="font-body text-base text-gray-600 leading-relaxed mb-8">
+            <p className="font-body text-base text-muted-foreground leading-relaxed mb-8">
               O RED transforma dados brutos em insights acionáveis. Dashboards intuitivos permitem 
               que gestores e professores identifiquem padrões, antecipem problemas e tomem decisões 
               pedagógicas com mais confiança e precisão.
@@ -91,10 +91,10 @@ export default function DataSection() {
                         <Icon size={18} className="text-red-brand" />
                       </div>
                       <div>
-                        <h4 className="font-heading font-semibold text-gray-900 text-sm mb-1">
+                        <h4 className="font-heading font-semibold text-foreground text-sm mb-1">
                           {point.title}
                         </h4>
-                        <p className="font-body text-xs text-gray-600 leading-relaxed">
+                        <p className="font-body text-xs text-muted-foreground leading-relaxed">
                           {point.description}
                         </p>
                       </div>

@@ -1,112 +1,118 @@
 /*
  * Footer — RED Registro Escolar Digital
- * Design: Fundo azul escuro, logo branco, links organizados em colunas
+ * Design: Fundo azul escuro, logo branco, presença institucional compacta
  */
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
-  const scrollTo = (id: string) => {
-    document.querySelector(id)?.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
-    <footer className="bg-blue-brand text-white">
-      <div className="container py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-          {/* Brand */}
-          <div className="lg:col-span-1">
-            <div className="flex items-center gap-3 mb-4">
+    <footer className="bg-card dark:bg-muted border-t border-border">
+      <div className="container py-12 lg:py-14">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] lg:gap-8 items-start">
+          <div className="space-y-4 max-w-sm">
+            <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-10 h-10 bg-red-brand rounded-sm shadow-sm">
-                <span className="font-condensed font-bold text-white text-lg tracking-wider">R</span>
+                <span className="font-condensed font-bold text-white text-lg tracking-wider">
+                  R
+                </span>
               </div>
               <div className="flex flex-col leading-none">
-                <span className="font-condensed font-bold text-white text-xl tracking-widest uppercase">RED</span>
-                <span className="font-body text-[10px] text-white/50 tracking-wider uppercase">Registro Escolar Digital</span>
+                <span className="font-condensed font-bold text-foreground text-xl tracking-widest uppercase">
+                  RED
+                </span>
+                <span className="font-body text-[10px] text-muted-foreground tracking-wider uppercase">
+                  Registro Escolar Digital
+                </span>
               </div>
             </div>
-            <p className="font-body text-sm text-white/60 leading-relaxed mb-5">
-              Plataforma digital integrada para centralizar registros escolares e fortalecer a conexão entre escola e família.
+
+            <p className="font-body text-sm text-muted-foreground leading-relaxed max-w-xs">
+              Plataforma digital para centralizar registros escolares e
+              fortalecer a comunicação entre escola e família.
             </p>
-            <div className="flex gap-3">
-              {["in", "f", "ig"].map((social) => (
-                <button
-                  key={social}
-                  className="w-8 h-8 rounded-sm bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                  aria-label={`Rede social ${social}`}
-                >
-                  <span className="font-condensed font-bold text-white text-xs uppercase">{social}</span>
-                </button>
-              ))}
-            </div>
+
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 w-fit rounded-sm bg-muted/50 dark:bg-muted/30 hover:bg-muted/70 dark:hover:bg-muted/50 px-3 py-2 transition-colors text-foreground"
+              aria-label="Instagram"
+            >
+              <span className="font-condensed font-bold text-foreground text-xs uppercase">
+                Instagram
+              </span>
+            </a>
           </div>
 
-          {/* Platform */}
           <div>
-            <h4 className="font-heading font-semibold text-white text-sm mb-4 uppercase tracking-wider">
+            <h4 className="font-heading font-semibold text-foreground text-sm mb-3 uppercase tracking-wider">
               Plataforma
             </h4>
-            <ul className="flex flex-col gap-2.5">
+            <ul className="flex flex-col gap-2">
               {[
-                { label: "Funcionalidades", id: "#funcionalidades" },
-                { label: "Como Funciona", id: "#como-funciona" },
-                { label: "Benefícios", id: "#beneficios" },
-                { label: "Depoimentos", id: "#depoimentos" },
-                { label: "Solicitar Demo", id: "#contato" },
-              ].map((item) => (
+                { label: "Funcionalidades", href: "/#funcionalidades" },
+                { label: "Benefícios", href: "#beneficios" },
+                { label: "Contato", href: "#contato" },
+                {
+                  label: "Acessar Plataforma",
+                  href: "/profile-selector?source=footer",
+                },
+              ].map(item => (
                 <li key={item.label}>
-                  <button
-                    onClick={() => scrollTo(item.id)}
-                    className="font-body text-sm text-white/60 hover:text-white transition-colors animated-underline"
+                  <a
+                    href={item.href}
+                    className="font-body text-sm text-muted-foreground hover:text-foreground transition-colors animated-underline"
                   >
                     {item.label}
-                  </button>
+                  </a>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Solutions */}
           <div>
-            <h4 className="font-heading font-semibold text-white text-sm mb-4 uppercase tracking-wider">
-              Soluções
+            <h4 className="font-heading font-semibold text-foreground text-sm mb-3 uppercase tracking-wider">
+              Legal
             </h4>
-            <ul className="flex flex-col gap-2.5">
+            <ul className="flex flex-col gap-2">
               {[
-                "Gestão Acadêmica",
-                "Comunicação Escola-Família",
-                "Relatórios Pedagógicos",
-                "Controle de Frequência",
-                "Registro Comportamental",
-                "Documentos Digitais",
-              ].map((item) => (
-                <li key={item}>
-                  <span className="font-body text-sm text-white/60">
-                    {item}
-                  </span>
+                {
+                  label: "Política de Privacidade",
+                  href: "/legal/privacy-policy",
+                },
+                { label: "Termos de Uso", href: "/legal/terms" },
+                { label: "Conformidade LGPD", href: "/legal/lgpd" },
+              ].map(item => (
+                <li key={item.label}>
+                  <a
+                    href={item.href}
+                    className="font-body text-sm text-muted-foreground hover:text-foreground transition-colors animated-underline"
+                  >
+                    {item.label}
+                  </a>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Legal */}
           <div>
-            <h4 className="font-heading font-semibold text-white text-sm mb-4 uppercase tracking-wider">
-              Legal e Suporte
+            <h4 className="font-heading font-semibold text-foreground text-sm mb-3 uppercase tracking-wider">
+              Suporte
             </h4>
-            <ul className="flex flex-col gap-2.5">
+            <ul className="flex flex-col gap-2">
               {[
-                "Política de Privacidade",
-                "Termos de Uso",
-                "Conformidade LGPD",
-                "Central de Ajuda",
-                "Documentação",
-                "Status do Sistema",
-              ].map((item) => (
-                <li key={item}>
-                  <span className="font-body text-sm text-white/60 cursor-pointer hover:text-white transition-colors">
-                    {item}
-                  </span>
+                { label: "Central de Ajuda", href: "/support/help-center" },
+                { label: "Documentação", href: "/support/documentation" },
+                { label: "Status do Sistema", href: "/support/system-status" },
+              ].map(item => (
+                <li key={item.label}>
+                  <a
+                    href={item.href}
+                    className="font-body text-sm text-muted-foreground hover:text-foreground transition-colors animated-underline"
+                  >
+                    {item.label}
+                  </a>
                 </li>
               ))}
             </ul>
@@ -115,20 +121,14 @@ export default function Footer() {
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/10">
-        <div className="container py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="font-body text-xs text-white/40">
-            © {currentYear} RED — Registro Escolar Digital. Todos os direitos reservados.
+      <div className="border-t border-border">
+        <div className="container py-4 flex items-center justify-between gap-3">
+          <p className="font-body text-xs text-muted-foreground">
+            © {currentYear} RED — Registro Escolar Digital.
           </p>
-          <div className="flex items-center gap-4">
-            <span className="font-body text-xs text-white/40">
-              Desenvolvido com foco na educação brasileira
-            </span>
-            <span className="text-white/20">•</span>
-            <span className="font-body text-xs text-white/40">
-              LGPD Compliant
-            </span>
-          </div>
+          <span className="font-body text-xs text-muted-foreground">
+            Feito para a educação brasileira
+          </span>
         </div>
       </div>
     </footer>
