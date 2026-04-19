@@ -55,8 +55,9 @@ curl "https://red-registro-escolar.onrender.com/api/trpc/system.health" \
 ```
 
 Resposta esperada:
+
 ```json
-{"result":{"data":{"ok":true}}}
+{ "result": { "data": { "ok": true } } }
 ```
 
 ## Setup Vercel (Frontend)
@@ -124,22 +125,22 @@ VITE_ANALYTICS_WEBSITE_ID=<deixar-vazio-para-demo>
 
 ### "No open ports detected" no Render
 
-**Causa**: `API_ONLY_MODE` não foi definido ou JWT_SECRET falta.  
+**Causa**: `API_ONLY_MODE` não foi definido ou JWT_SECRET falta.
 **Solução**: Verifique Environment Variables → redeploy.
 
 ### "Failed to resolve module" no Vercel
 
-**Causa**: Build rodou antes de fazer commit das mudanças.  
+**Causa**: Build rodou antes de fazer commit das mudanças.
 **Solução**: Commit, push, e força rebuild no Vercel.
 
 ### CORS error "Access to XMLHttpRequest blocked"
 
-**Causa**: O Vercel não conseguiu reescrever `/api/*` para Render.  
+**Causa**: O Vercel não conseguiu reescrever `/api/*` para Render.
 **Solução**: Confirme que `vercel.json` está no repositório e redeploy.
 
 ### Demo Login fica em loading infinito
 
-**Causa**: Render em cold start (espiar logs) ou variáveis de ambiente incompletas.  
+**Causa**: Render em cold start (espiar logs) ou variáveis de ambiente incompletas.
 **Solução**: Aguarde 50s para warm-up da instância free e recar
 regue.
 
