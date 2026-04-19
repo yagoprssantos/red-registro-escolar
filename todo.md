@@ -1,6 +1,7 @@
 # RED — Registro Escolar Digital — TODO
 
 ## Autenticação e Área Restrita
+
 - [x] Criar tabela de escolas (schools) no banco de dados
 - [x] Criar tabela de associação entre usuários e escolas
 - [x] Implementar router de autenticação com procedures protegidas
@@ -13,6 +14,7 @@
 - [x] Validar fluxo completo de login → dashboard → logout
 
 ## Múltiplos Perfis de Usuário
+
 - [x] Criar tabelas para professores, alunos e responsáveis
 - [x] Implementar seletor de perfil na página de login
 - [x] Criar dashboard para professores com turmas e alunos
@@ -23,11 +25,13 @@
 - [x] Validar fluxo completo com todos os perfis
 
 ## Melhorias de UX
+
 - [x] Criar botão de login bem aparente na landing page
 - [x] Adicionar botão flutuante de login
 - [x] Melhorar visibilidade do CTA de login
 
 ## Onboarding Pós-Login
+
 - [x] Criar página de onboarding com wizard de múltiplos passos
 - [x] Implementar passo 1: Dados pessoais (nome, email, telefone)
 - [x] Implementar passo 2: Seleção de escola ou criação de nova escola
