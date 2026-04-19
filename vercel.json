@@ -1,18 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://red-registro-escolar.onrender.com/api/:path*"
-    }
-  ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://red-registro-escolar.onrender.com/api/$1"
+    },
     {
       "handle": "filesystem"
     },
     {
-      "src": "/.*",
+      "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
