@@ -282,6 +282,7 @@ class SDKServer {
         email: null,
         loginMethod: "demo",
         role: "user",
+        defaultProfile: null,
         createdAt: signedInAt,
         updatedAt: signedInAt,
         lastSignedIn: signedInAt,

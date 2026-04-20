@@ -23,6 +23,7 @@ function createAuthContext(): {
     name: "Sample User",
     loginMethod: "oauth",
     role: "user",
+    defaultProfile: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -63,5 +64,3 @@ describe("auth.logout", () => {
     });
   });
 });
-
-

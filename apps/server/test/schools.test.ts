@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { User } from "../../../drizzle/schema";
 import type { TrpcContext } from "../src/core/context";
 import { appRouter } from "../src/routers";
 
@@ -27,6 +28,7 @@ function createAuthenticatedContext(userId: number = 1): TrpcContext {
     name: `User ${userId}`,
     loginMethod: "oauth",
     role: "user",
+    defaultProfile: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -145,6 +147,7 @@ describe("schools router", () => {
         name: "New User",
         loginMethod: "oauth",
         role: "user",
+        defaultProfile: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         lastSignedIn: new Date(),
@@ -195,5 +198,3 @@ describe("schools router", () => {
     });
   });
 });
-
-

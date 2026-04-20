@@ -1,6 +1,17 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "./core/trpc";
+import {
+  getGuardianProfile,
+  getGuardianStudentPerformance,
+  getGuardianStudents,
+  getStudentCommunications,
+  getStudentGrades,
+  getStudentProfile,
+  getTeacherClassGrades,
+  getTeacherClasses,
+  getTeacherProfile,
+} from "./db";
 
 /**
  * Routers específicos para cada perfil de usuário
@@ -19,16 +30,16 @@ export const profilesRouter = router({
         });
       }
 
-      // TODO: Buscar dados do professor no banco
-      return {
-        id: ctx.user.id,
-        name: ctx.user.name,
-        email: ctx.user.email,
-        subject: "Matemática",
-        school: "Escola Municipal ABC",
-        classes: [],
-        students: [],
-      };
+      const teacher = await getTeacherProfile(ctx.user.id);
+
+      if (!teacher) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Perfil de professor não encontrado",
+        });
+      }
+
+      return teacher;
     }),
 
     classes: protectedProcedure.query(async ({ ctx }) => {
@@ -39,12 +50,7 @@ export const profilesRouter = router({
         });
       }
 
-      // TODO: Buscar turmas do professor
-      return [
-        { id: 1, name: "6º Ano A", subject: "Matemática", students: 28 },
-        { id: 2, name: "6º Ano B", subject: "Matemática", students: 26 },
-        { id: 3, name: "7º Ano A", subject: "Matemática", students: 30 },
-      ];
+      return await getTeacherClasses(ctx.user.id);
     }),
 
     grades: protectedProcedure
@@ -57,8 +63,7 @@ export const profilesRouter = router({
           });
         }
 
-        // TODO: Buscar notas da turma
-        return [];
+        return await getTeacherClassGrades(ctx.user.id, input.classId);
       }),
   }),
 
@@ -74,16 +79,16 @@ export const profilesRouter = router({
         });
       }
 
-      // TODO: Buscar dados do aluno no banco
-      return {
-        id: ctx.user.id,
-        name: ctx.user.name,
-        email: ctx.user.email,
-        grade: "6º Ano A",
-        school: "Escola Municipal ABC",
-        averageGrade: 8.5,
-        absences: 2,
-      };
+      const student = await getStudentProfile(ctx.user.id);
+
+      if (!student) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Perfil de aluno não encontrado",
+        });
+      }
+
+      return student;
     }),
 
     grades: protectedProcedure.query(async ({ ctx }) => {
@@ -94,12 +99,7 @@ export const profilesRouter = router({
         });
       }
 
-      // TODO: Buscar notas do aluno
-      return [
-        { subject: "Matemática", grade: 8.5, date: "2026-04-15" },
-        { subject: "Português", grade: 9.0, date: "2026-04-14" },
-        { subject: "Ciências", grade: 7.8, date: "2026-04-12" },
-      ];
+      return await getStudentGrades(ctx.user.id);
     }),
 
     communications: protectedProcedure.query(async ({ ctx }) => {
@@ -110,8 +110,7 @@ export const profilesRouter = router({
         });
       }
 
-      // TODO: Buscar comunicados da escola
-      return [];
+      return await getStudentCommunications(ctx.user.id);
     }),
   }),
 
@@ -127,14 +126,16 @@ export const profilesRouter = router({
         });
       }
 
-      // TODO: Buscar dados do responsável
-      return {
-        id: ctx.user.id,
-        name: ctx.user.name,
-        email: ctx.user.email,
-        relationship: "Pai",
-        students: [],
-      };
+      const guardian = await getGuardianProfile(ctx.user.id);
+
+      if (!guardian) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Perfil de responsável não encontrado",
+        });
+      }
+
+      return guardian;
     }),
 
     students: protectedProcedure.query(async ({ ctx }) => {
@@ -145,8 +146,7 @@ export const profilesRouter = router({
         });
       }
 
-      // TODO: Buscar filhos/alunos do responsável
-      return [];
+      return await getGuardianStudents(ctx.user.id);
     }),
 
     studentPerformance: protectedProcedure
@@ -159,13 +159,19 @@ export const profilesRouter = router({
           });
         }
 
-        // TODO: Buscar desempenho do aluno
-        return {
-          studentId: input.studentId,
-          grades: [],
-          absences: 0,
-          alerts: [],
-        };
+        const performance = await getGuardianStudentPerformance(
+          ctx.user.id,
+          input.studentId
+        );
+
+        if (!performance) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Aluno não está vinculado a este responsável",
+          });
+        }
+
+        return performance;
       }),
   }),
 });

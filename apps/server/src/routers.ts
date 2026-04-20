@@ -7,13 +7,18 @@ import { systemRouter } from "./core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./core/trpc";
 import {
   createContact,
+  createGuardianProfile,
   createSchool,
+  createSchoolStaffProfile,
+  createStudentProfile,
+  createTeacherProfile,
   createUserSchool,
   getContacts,
   getDb,
   getSchoolByEmail,
   getSchoolContacts,
   getUserSchools,
+  linkStudentGuardian,
 } from "./db";
 import { profilesRouter } from "./profiles";
 
@@ -244,10 +249,67 @@ export const appRouter = router({
 
           // Vincular usuário à escola
           if (schoolId) {
+            const roleByPosition =
+              input.professionalData.position === "teacher"
+                ? "teacher"
+                : input.professionalData.position === "guardian"
+                  ? "guardian"
+                  : "admin";
+
             await createUserSchool({
               userId: ctx.user.id,
               schoolId: schoolId,
+              role: roleByPosition,
             });
+
+            if (input.professionalData.position === "teacher") {
+              await createTeacherProfile({
+                userId: ctx.user.id,
+                schoolId,
+                name: input.personalData.name,
+                email: input.personalData.email,
+                phone: input.personalData.phone,
+                subject: input.professionalData.subject || null,
+              });
+            }
+
+            if (input.professionalData.position === "guardian") {
+              const guardian = await createGuardianProfile({
+                userId: ctx.user.id,
+                schoolId,
+                name: input.personalData.name,
+                email: input.personalData.email,
+                phone: input.personalData.phone,
+                relationship: "Responsável",
+              });
+
+              // Seed mínimo para o responsável ter ao menos um aluno vinculado.
+              if (guardian) {
+                const student = await createStudentProfile({
+                  schoolId,
+                  name: `Aluno de ${input.personalData.name.split(" ")[0]}`,
+                  grade: input.professionalData.grade || "6o Ano",
+                });
+
+                if (student) {
+                  await linkStudentGuardian({
+                    studentId: student.id,
+                    guardianId: guardian.id,
+                    relationship: "Responsável",
+                    isPrimary: 1,
+                  });
+                }
+              }
+            }
+
+            if (input.professionalData.position === "admin") {
+              await createSchoolStaffProfile({
+                userId: ctx.user.id,
+                schoolId,
+                role: "admin",
+                positionTitle: "Administrador",
+              });
+            }
           }
 
           return {

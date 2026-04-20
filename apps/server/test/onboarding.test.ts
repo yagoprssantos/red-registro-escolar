@@ -11,6 +11,7 @@ function createAuthContext(): { ctx: TrpcContext } {
     name: "Test User",
     loginMethod: "oauth",
     role: "user",
+    defaultProfile: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -145,5 +146,3 @@ describe("onboarding.complete", () => {
     }
   });
 });
-
-
