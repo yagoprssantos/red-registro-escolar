@@ -33,7 +33,7 @@ export default function Footer() {
             </p>
 
             <a
-              href="https://instagram.com"
+              href="https://instagram.com/registroescolardigital"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 w-fit rounded-sm bg-muted/50 dark:bg-muted/30 hover:bg-muted/70 dark:hover:bg-muted/50 px-3 py-2 transition-colors text-foreground"

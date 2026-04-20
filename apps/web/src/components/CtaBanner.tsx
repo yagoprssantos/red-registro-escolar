@@ -51,8 +51,8 @@ export default function CtaBanner() {
               Pronto para digitalizar sua escola?
             </h2>
             <p className="font-body text-sm sm:text-base text-white/75 leading-relaxed">
-              Junte-se a mais de 500 escolas que já transformaram sua gestão com
-              o RED. Entre em contato com nossa equipe para saber mais.
+              Transforme sua gestão com o RED. Entre em contato com nossa equipe
+              para saber mais.
             </p>
           </div>
 

@@ -103,8 +103,8 @@ export default function ContactSection() {
                 {
                   icon: Mail,
                   label: "E-mail",
-                  value: "contato@redescolar.com.br",
-                  href: "mailto:contato@redescolar.com.br",
+                  value: "registroescolardigital@gmail.com",
+                  href: "mailto:registroescolardigital@gmail.com",
                 },
                 {
                   icon: MapPin,
@@ -138,12 +138,7 @@ export default function ContactSection() {
 
             {/* Trust badges */}
             <div className="flex flex-wrap gap-3">
-              {[
-                "LGPD Compliant",
-                "ISO 27001",
-                "Suporte 24h",
-                "Dados no Brasil",
-              ].map(badge => (
+              {["LGPD Compliant", "ISO 27001", "Dados no Brasil"].map(badge => (
                 <span
                   key={badge}
                   className="font-body text-xs text-white/80 border border-white/30 rounded-full px-3 py-1"

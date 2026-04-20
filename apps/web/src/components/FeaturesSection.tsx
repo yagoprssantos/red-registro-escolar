@@ -6,11 +6,9 @@
 
 import {
   Award,
-  BarChart3,
   Bell,
   BookOpen,
   Calendar,
-  FileText,
   MessageSquare,
   Shield,
   Users,
@@ -40,13 +38,6 @@ const features = [
     highlight: false,
   },
   {
-    icon: BarChart3,
-    title: "Relatórios e Análises",
-    description:
-      "Dashboards intuitivos com indicadores de desempenho, frequência e comportamento. Apoio à tomada de decisão pedagógica baseada em dados.",
-    highlight: true,
-  },
-  {
     icon: Calendar,
     title: "Agenda e Calendário Escolar",
     description:
@@ -58,13 +49,6 @@ const features = [
     title: "Notificações em Tempo Real",
     description:
       "Alertas automáticos sobre faltas, notas lançadas, comunicados e ocorrências. Responsáveis sempre informados e engajados.",
-    highlight: false,
-  },
-  {
-    icon: FileText,
-    title: "Documentos e Declarações",
-    description:
-      "Emissão digital de declarações de matrícula, histórico escolar e boletins. Redução de burocracia e agilidade no atendimento.",
     highlight: false,
   },
   {

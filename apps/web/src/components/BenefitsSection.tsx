@@ -14,8 +14,6 @@ const profiles = [
     color: "bg-red-brand",
     benefits: [
       "Centralização de todos os dados acadêmicos",
-      "Relatórios automáticos para gestão",
-      "Redução de 70% no trabalho burocrático",
       "Conformidade com exigências legais e LGPD",
       "Tomada de decisão baseada em dados reais",
       "Comunicação institucional eficiente",
@@ -27,11 +25,9 @@ const profiles = [
     color: "bg-blue-brand",
     benefits: [
       "Lançamento rápido de notas e frequências",
-      "Planejamento de aulas integrado",
       "Comunicação direta com responsáveis",
       "Histórico completo de cada aluno",
       "Menos papelada, mais tempo pedagógico",
-      "Acesso de qualquer dispositivo",
     ],
   },
   {
@@ -41,8 +37,6 @@ const profiles = [
     benefits: [
       "Acompanhamento em tempo real",
       "Notificações de notas e faltas",
-      "Canal direto com professores",
-      "Boletim digital sempre disponível",
       "Confirmação de eventos e reuniões",
       "Transparência total sobre o filho",
     ],

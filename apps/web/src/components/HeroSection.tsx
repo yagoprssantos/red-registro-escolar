@@ -46,8 +46,8 @@ export default function HeroSection() {
           >
             Registro Escolar{" "}
             <span className="italic text-white/90">Digital</span> <br />
-            <span className="text-white/80 text-2xl sm:text-3xl lg:text-5xl font-normal">
-              que transforma a educação
+            <span className="inline-block whitespace-nowrap text-white/80 text-2xl sm:text-3xl lg:text-5xl font-normal">
+              que facilita o acompanhamento escolar
             </span>
           </h1>
 
@@ -57,9 +57,9 @@ export default function HeroSection() {
               visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           >
-            Centralize registros acadêmicos, comportamentais e comunicações em
-            uma única plataforma. Aproxime escola e família com transparência,
-            agilidade e inteligência pedagógica.
+            Integre todas as informações da vida escolar em uma única
+            plataforma, melhorando a conexão entre escola e família com mais
+            praticidade e eficiência no acompanhamento dos alunos.
           </p>
 
           {/* Checkpoints */}
