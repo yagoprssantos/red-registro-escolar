@@ -1,177 +1,111 @@
-# Guia de Deploy: Frontend Vercel + Backend Render
+# Deploy Guide: Vercel + Render + Supabase
 
-Este documento descreve como manter o frontend no Vercel e o backend no Render de forma separada e escalável.
+This project runs best with:
 
-## Arquitetura
+- Frontend on Vercel
+- Backend API on Render
+- Database on Supabase PostgreSQL
 
-```
-Usuário
-  ↓
-Vercel (Frontend React)
-  ├─ Domínio público (ex: red-registro-escolar.vercel.app)
-  ├─ Rewrite /api/* → Render
-  └─ Serve rotas SPA
-  ↓
-Render (Backend API)
-  ├─ Domínio público (ex: red-registro-escolar.onrender.com)
-  ├─ Apenas /api/trpc e /api/oauth
-  └─ Modo API-only (sem frontend estático)
-```
+## Target Architecture
 
-## Setup Render (Backend API-only)
+User -> Vercel (frontend) -> Render (API) -> Supabase (PostgreSQL)
 
-### 1. Environment Variables
+Frontend calls `/api/*` on the same domain, and Vercel rewrites to Render.
 
-No painel Render, adicione:
+## 1) Render (Backend)
 
-```
-API_ONLY_MODE=true
-JWT_SECRET=<seu-secreto-forte>
-VITE_APP_ID=red-registro-escolar
-OAUTH_SERVER_URL=<deixar-vazio-para-demo>
-DATABASE_URL=<deixar-vazio-para-demo>
-NODE_ENV=production
-```
+Use an existing Render Web Service connected to this repository.
 
-### 2. Build Settings
+### Build and Start
 
-- **Build Command**: `corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install --frozen-lockfile && pnpm build`
-- **Start Command**: `pnpm start`
-- **Root Directory**: (deixe vazio, raiz do repo)
+- Build Command: `corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install --frozen-lockfile && pnpm build`
+- Start Command: `pnpm start`
+- Root Directory: repository root
+- Health Check Path: `/healthz`
 
-### 3. Deploy
+### Render Required Environment Variables
 
-1. Commit e push as mudanças
-2. Render faz deploy automático do branch main
-3. Aguarde "Service running on http://localhost:xxxx"
+- `API_ONLY_MODE=true`
+- `NODE_ENV=production`
+- `JWT_SECRET=<strong-random-secret>`
+- `VITE_APP_ID=red-registro-escolar`
+- `DATABASE_URL=postgresql://postgres:<PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres`
 
-### Testar Backend
+### Render Optional Environment Variables
 
-```bash
-curl "https://red-registro-escolar.onrender.com/api/trpc/system.health" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"0":{"json":{"timestamp":0}}}'
-```
+- `OAUTH_SERVER_URL=<oauth-url>`
+- `OWNER_OPEN_ID=<owner-open-id>`
+- `BUILT_IN_FORGE_API_URL=<internal-service-url>`
+- `BUILT_IN_FORGE_API_KEY=<internal-service-key>`
 
-Resposta esperada:
+### Important Notes for DATABASE_URL
 
-```json
-{ "result": { "data": { "ok": true } } }
-```
+- Prefer Supabase direct URL for Render because this backend is persistent.
+- If your network/policy requires it, append `?sslmode=require` to the URL.
+- The app already enforces SSL at runtime in the postgres client.
 
-## Setup Vercel (Frontend)
+## 2) Vercel (Frontend)
 
-### 1. Environment Variables
+Use an existing Vercel project connected to this repository.
 
-No painel Vercel, adicione:
+### Build Settings
 
-```
-VITE_APP_ID=red-registro-escolar
-VITE_OAUTH_PORTAL_URL=<deixar-vazio-para-demo>
-VITE_ANALYTICS_ENDPOINT=<deixar-vazio-para-demo>
-VITE_ANALYTICS_WEBSITE_ID=<deixar-vazio-para-demo>
-```
+- Framework: Vite
+- Install Command: `corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install --frozen-lockfile`
+- Build Command: `pnpm build`
+- Output Directory: `dist/public`
+- Root Directory: repository root
 
-### 2. Build Settings
+### Vercel Required Environment Variables
 
-- **Framework**: Vite
-- **Install Command**: `corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install --frozen-lockfile`
-- **Build Command**: `pnpm build`
-- **Output Directory**: `dist/public`
-- **Root Directory**: (deixe vazio, raiz do repo)
+- `VITE_APP_ID=red-registro-escolar`
 
-### 3. Deploy
+### Vercel Optional Environment Variables
 
-1. Commit e push as mudanças
-2. Vercel faz deploy automático do branch main
-3. Aguarde "Production Deployment Ready"
+- `VITE_OAUTH_PORTAL_URL=<oauth-url>`
+- `VITE_ANALYTICS_ENDPOINT=<https://analytics.example.com>`
+- `VITE_ANALYTICS_WEBSITE_ID=<analytics-site-id>`
 
-### Testar Frontend
+## 3) Rewrite Config (Vercel -> Render)
 
-1. Abra: https://seu-vercel-domain.vercel.app
-2. Teste rota SPA: https://seu-vercel-domain.vercel.app/legal/privacy-policy
-3. Teste API (login demo): use o formulário no site
+The file `vercel.json` already rewrites:
 
-## Como funciona o fluxo de requisições
+- `/api/:path*` -> `https://red-registro-escolar.onrender.com/api/:path*`
+- all other routes -> `/` (SPA fallback)
 
-### Frontend → Backend (tRPC + API)
+If your Render domain is different, update the destination in `vercel.json`.
 
-1. Usuário clica em "Demo Login" no Vercel
-2. Vercel recebe a requisição em `/api/auth/demo-login`
-3. `vercel.json` reescreve para `https://red-registro-escolar.onrender.com/api/auth/demo-login`
-4. Render processa e retorna resposta
-5. Vercel encaminha resposta ao frontend
-6. Frontend recebe cookie de sessão e redireciona
+## 4) First-Time Validation Checklist
 
-### OAuth Callback (se configurado futuramente)
+Run in this exact order after deployment:
 
-1. Usuário clica "Login com OAuth"
-2. OAuth portal redireciona para: `https://seu-vercel-domain.vercel.app/api/oauth/callback`
-3. Vercel reescreve para `https://red-registro-escolar.onrender.com/api/oauth/callback`
-4. Render valida token e cria sessão
-5. Backend redireciona para: `/dashboard` (relativivo, volta para Vercel)
-6. Frontend renderiza dashboard
+1. Open `https://<render-domain>/healthz` and confirm `ok: true`.
+2. Open `https://<vercel-domain>/` and check initial page load.
+3. Test an API call through Vercel rewrite:
+   - `https://<vercel-domain>/api/trpc/system.health` (POST request from app flow)
+4. Execute demo login from frontend and confirm session creation.
+5. Submit contact form and verify backend persistence.
 
-## Checklist pós-deploy
+## 5) Common Problems
 
-- [ ] Render mostra "Service running on http://localhost:xxxx" (sem erros)
-- [ ] Vercel mostra "Production Deployment Ready"
-- [ ] Testar `/legal/privacy-policy` no Vercel (rota SPA deve funcionar)
-- [ ] Testar Demo Login (chegar até dashboard, mesmo que vazio)
-- [ ] Testar ContactSection > enviar formulário (salvar no backend)
+### Render starts but DB fails
 
-## Troubleshooting
+- Cause: wrong `DATABASE_URL` or blocked direct connection.
+- Fix: copy Supabase direct URI again and redeploy.
 
-### "No open ports detected" no Render
+### CORS errors in browser
 
-**Causa**: `API_ONLY_MODE` não foi definido ou JWT_SECRET falta.
-**Solução**: Verifique Environment Variables → redeploy.
+- Cause: frontend calling Render directly instead of same-origin `/api/*`.
+- Fix: keep frontend requests on `/api/*` and let Vercel rewrite.
 
-### "Failed to resolve module" no Vercel
+### Vercel build succeeds but API fails
 
-**Causa**: Build rodou antes de fazer commit das mudanças.
-**Solução**: Commit, push, e força rebuild no Vercel.
+- Cause: rewrite destination not matching current Render domain.
+- Fix: update `vercel.json` and trigger redeploy.
 
-### CORS error "Access to XMLHttpRequest blocked"
+## 6) Suggested Production Hardening
 
-**Causa**: O Vercel não conseguiu reescrever `/api/*` para Render.
-**Solução**: Confirme que `vercel.json` está no repositório e redeploy.
-
-### Demo Login fica em loading infinito
-
-**Causa**: Render em cold start (espiar logs) ou variáveis de ambiente incompletas.
-**Solução**: Aguarde 50s para warm-up da instância free e recar
-regue.
-
-## Variáveis de ambiente para produção (com banco + OAuth)
-
-Quando quiser adicionar banco de dados e OAuth:
-
-### Render
-
-```
-API_ONLY_MODE=true
-JWT_SECRET=<valor-aleatório-64-bytes>
-VITE_APP_ID=red-registro-escolar
-OAUTH_SERVER_URL=<seu-oauth-portal>
-OWNER_OPEN_ID=<seu-owner-id>
-DATABASE_URL=mysql://user:pass@host/dbname
-NODE_ENV=production
-```
-
-### Vercel
-
-```
-VITE_APP_ID=red-registro-escolar
-VITE_OAUTH_PORTAL_URL=<seu-oauth-portal>
-VITE_ANALYTICS_ENDPOINT=<opcional>
-VITE_ANALYTICS_WEBSITE_ID=<opcional>
-```
-
-## Para escalabilidade futura
-
-1. **Mais replicas do backend**: Upgrade Render para plano pago, aumentar "Instance Type".
-2. **CDN global do frontend**: Vercel já inclui automaticamente.
-3. **Database redundância**: Configure MySQL em produção com backup automático.
-4. **Monitoramento**: Configure logs no Render e Vercel para alertas.
+- Rotate `JWT_SECRET` periodically.
+- Restrict OAuth callback domains to your Vercel production domain.
+- Enable Supabase backups and monitor slow queries.
+- Add uptime monitor for `/healthz`.
