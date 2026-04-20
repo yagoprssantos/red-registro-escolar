@@ -57,13 +57,19 @@ export default function Navbar({
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-card shadow-md py-2.5 sm:py-3"
-          : "bg-card/95 backdrop-blur-sm py-3 sm:py-4"
+      className={`fixed top-0 left-0 right-0 z-50 border-b border-border/40 transition-all duration-300 ${
+        scrolled ? "bg-card shadow-md" : "bg-card/95 backdrop-blur-sm"
       }`}
+      style={{
+        paddingTop: scrolled
+          ? "clamp(0.5rem, 0.9vw, 0.8rem)"
+          : "clamp(0.7rem, 1.1vw, 1rem)",
+        paddingBottom: scrolled
+          ? "clamp(0.5rem, 0.9vw, 0.8rem)"
+          : "clamp(0.7rem, 1.1vw, 1rem)",
+      }}
     >
-      <div className="container flex min-h-[3.75rem] items-center justify-between gap-3">
+      <div className="container flex min-h-[clamp(4rem,5vw,5.75rem)] items-center justify-between gap-[clamp(0.75rem,1.4vw,1.5rem)]">
         {/* Logo */}
         <BrandTitleLogo
           href={isHomePage ? "#inicio" : "/"}
@@ -77,7 +83,7 @@ export default function Navbar({
         />
 
         {/* Desktop Nav */}
-        <nav className="hidden lg:flex items-center gap-6 xl:gap-8">
+        <nav className="hidden lg:flex items-center gap-[clamp(1.25rem,1.8vw,2.25rem)]">
           {navLinks.map(link => (
             <a
               key={link.href}
@@ -86,7 +92,7 @@ export default function Navbar({
                 e.preventDefault();
                 handleNavClick(link.href);
               }}
-              className="font-body text-sm font-medium text-muted-foreground animated-underline hover:text-red-brand transition-colors duration-200"
+              className="font-body text-[clamp(0.875rem,0.7vw,0.98rem)] font-medium text-muted-foreground animated-underline hover:text-red-brand transition-colors duration-200"
             >
               {link.label}
             </a>
@@ -96,7 +102,7 @@ export default function Navbar({
             <a
               key={link.href}
               href={link.href}
-              className="font-body text-sm font-medium text-muted-foreground animated-underline hover:text-red-brand transition-colors duration-200"
+              className="font-body text-[clamp(0.875rem,0.7vw,0.98rem)] font-medium text-muted-foreground animated-underline hover:text-red-brand transition-colors duration-200"
             >
               {link.label}
             </a>
@@ -104,13 +110,13 @@ export default function Navbar({
         </nav>
 
         {/* CTA Buttons */}
-        <div className="hidden lg:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-[clamp(0.65rem,1vw,0.9rem)]">
           {showThemeToggle ? <ThemeToggleButton /> : null}
 
           {/* Login Button - Prominent */}
           <a
             href="/profile-selector?source=navbar"
-            className="font-heading font-semibold text-sm px-6 py-2.5 bg-red-brand text-white rounded-lg hover:bg-red-brand-dark transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 flex items-center gap-2 group"
+            className="font-heading font-semibold text-[clamp(0.82rem,0.65vw,0.95rem)] px-[clamp(1.1rem,1.8vw,1.5rem)] py-[clamp(0.6rem,0.95vw,0.8rem)] bg-red-brand text-white rounded-lg hover:bg-red-brand-dark transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 flex items-center gap-[clamp(0.4rem,0.6vw,0.5rem)] group"
           >
             <LogIn
               size={18}
@@ -129,7 +135,7 @@ export default function Navbar({
                   handleNavClick("#contato");
                 }
               }}
-              className="font-heading font-semibold text-sm px-5 py-2.5 border-2 border-red-brand text-red-brand rounded-lg hover:bg-red-brand hover:text-white transition-colors duration-200"
+              className="font-heading font-semibold text-[clamp(0.82rem,0.65vw,0.95rem)] px-[clamp(1rem,1.5vw,1.35rem)] py-[clamp(0.6rem,0.95vw,0.8rem)] border-2 border-red-brand text-red-brand rounded-lg hover:bg-red-brand hover:text-white transition-colors duration-200"
             >
               Entrar em contato
             </a>
@@ -138,19 +144,19 @@ export default function Navbar({
 
         {/* Mobile Menu Button */}
         <button
-          className="lg:hidden p-2.5 text-muted-foreground hover:text-red-brand transition-colors"
+          className="lg:hidden inline-flex items-center justify-center rounded-md p-[clamp(0.55rem,1vw,0.75rem)] text-muted-foreground hover:text-red-brand transition-colors"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Menu"
           aria-expanded={mobileOpen}
           aria-controls="mobile-main-nav"
         >
-          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="lg:hidden bg-card border-t border-border shadow-lg max-h-[calc(100svh-4.2rem)] overflow-y-auto">
+        <div className="lg:hidden bg-card border-t border-border shadow-lg max-h-[calc(100svh-4.75rem)] overflow-y-auto">
           <nav
             id="mobile-main-nav"
             className="container py-3 flex flex-col gap-1"
