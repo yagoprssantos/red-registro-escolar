@@ -10,7 +10,9 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:seed:fake": "tsx apps/server/src/scripts/seed-fake-data.ts",
+    "db:clear:fake": "tsx apps/server/src/scripts/clear-fake-data.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
