@@ -1,12 +1,11 @@
 /*
  * LoginPage — RED Registro Escolar Digital
- * Página de login com redirecionamento OAuth por perfil
+ * Página de login real com Supabase Auth (senha + OAuth)
  */
 
-import { useAuth } from "@/core/hooks/useAuth";
 import BrandTitleLogo from "@/components/BrandTitleLogo";
 import FloatingThemeToggle from "@/components/FloatingThemeToggle";
-import { getLoginUrl } from "@/const";
+import { useAuth } from "@/core/hooks/useAuth";
 import { setPageMeta } from "@/lib/pageMeta";
 import {
   getProfileConfig,
@@ -14,94 +13,62 @@ import {
   profileOrder,
   type UserProfile,
 } from "@/lib/profiles";
-import { ArrowRight, LogIn, Sparkles } from "lucide-react";
+import { ArrowRight, Lock, LogIn, Mail } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
-type LoginField = {
-  key: string;
-  label: string;
-  placeholder: string;
-  type?: "text" | "email";
+type LoginPayload = {
+  success: boolean;
+  redirectTo?: string;
+  error?: string;
 };
 
-const profileInputConfig: Record<UserProfile, LoginField[]> = {
-  school: [
-    {
-      key: "schoolEmail",
-      label: "Email institucional",
-      placeholder: "direcao@escola.edu.br",
-      type: "email",
-    },
-    {
-      key: "schoolCode",
-      label: "Codigo da unidade",
-      placeholder: "Ex.: RED-0231",
-    },
-  ],
-  teacher: [
-    {
-      key: "teacherEmail",
-      label: "Email profissional",
-      placeholder: "professor@escola.edu.br",
-      type: "email",
-    },
-    {
-      key: "teacherRegistration",
-      label: "Registro funcional",
-      placeholder: "Ex.: RF-34812",
-    },
-  ],
-  student: [
-    {
-      key: "studentEmail",
-      label: "Email do aluno",
-      placeholder: "aluno@escola.edu.br",
-      type: "email",
-    },
-    {
-      key: "studentEnrollment",
-      label: "Matricula",
-      placeholder: "Ex.: 2026-001245",
-    },
-  ],
-  guardian: [
-    {
-      key: "guardianEmail",
-      label: "Email do responsavel",
-      placeholder: "responsavel@email.com",
-      type: "email",
-    },
-    {
-      key: "studentReference",
-      label: "Codigo do aluno",
-      placeholder: "Ex.: AL-7719",
-    },
-  ],
-};
+function GoogleLogo() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="#4285F4"
+        d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.44a5.5 5.5 0 0 1-2.39 3.61v2.99h3.86c2.26-2.08 3.58-5.15 3.58-8.84z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.92l-3.86-2.99c-1.08.72-2.45 1.16-4.07 1.16-3.12 0-5.76-2.11-6.7-4.96H1.31v3.08A11.99 11.99 0 0 0 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.3 14.29A7.2 7.2 0 0 1 4.94 12c0-.8.14-1.57.36-2.29V6.63H1.31A11.99 11.99 0 0 0 0 12c0 1.93.46 3.75 1.31 5.37l3.99-3.08z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.45-3.45C17.95 1.15 15.24 0 12 0 7.31 0 3.28 2.69 1.31 6.63l3.99 3.08C6.24 6.86 8.88 4.75 12 4.75z"
+      />
+    </svg>
+  );
+}
 
-const demoValuesByProfile: Record<UserProfile, Record<string, string>> = {
-  school: {
-    schoolEmail: "demo.escola@red.local",
-    schoolCode: "RED-DEMO-SCHOOL",
-  },
-  teacher: {
-    teacherEmail: "demo.professor@red.local",
-    teacherRegistration: "RF-DEMO-001",
-  },
-  student: {
-    studentEmail: "demo.aluno@red.local",
-    studentEnrollment: "MAT-DEMO-2026",
-  },
-  guardian: {
-    guardianEmail: "demo.responsavel@red.local",
-    studentReference: "ALUNO-DEMO-01",
-  },
-};
+function isSafeRelativePath(pathname: string | null): pathname is string {
+  if (!pathname) return false;
+  if (!pathname.startsWith("/")) return false;
+  if (pathname.startsWith("//")) return false;
+  return true;
+}
+
+function withProfile(pathname: string, profile: UserProfile) {
+  const parsed = new URL(pathname, window.location.origin);
+  parsed.searchParams.set("profile", profile);
+  return `${parsed.pathname}${parsed.search}`;
+}
 
 export default function LoginPage() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+
   const pageParams = useMemo(
     () => new URLSearchParams(window.location.search),
     []
@@ -126,26 +93,44 @@ export default function LoginPage() {
     useState<UserProfile>(initialProfile);
   const [isProfileTransitioning, setIsProfileTransitioning] = useState(false);
   const [isProfilePickerOpen, setIsProfilePickerOpen] = useState(false);
-  const [formValues, setFormValues] = useState<Record<string, string>>({});
-  const [isDemoLoading, setIsDemoLoading] = useState(false);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+  const [isOAuthFinalizing, setIsOAuthFinalizing] = useState(false);
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
 
   const profile = getProfileConfig(selectedProfile);
-  const currentLoginFields = profileInputConfig[selectedProfile];
-  const isLoginReady = currentLoginFields.every(field =>
-    Boolean(formValues[field.key]?.trim())
-  );
+
+  const returnPath = useMemo(() => {
+    const requestedReturnPath = pageParams.get("returnPath");
+
+    if (isSafeRelativePath(requestedReturnPath)) {
+      return withProfile(requestedReturnPath, selectedProfile);
+    }
+
+    return `/dashboard?profile=${selectedProfile}`;
+  }, [pageParams, selectedProfile]);
+
+  const isLoginReady = Boolean(email.trim() && password.trim());
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(profile.dashboardPath);
+      navigate("/dashboard");
     }
-  }, [isAuthenticated, navigate, profile.dashboardPath]);
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     sessionStorage.setItem("selectedProfile", selectedProfile);
+
     const params = new URLSearchParams(window.location.search);
     params.set("profile", selectedProfile);
+
+    if (isSafeRelativePath(pageParams.get("returnPath"))) {
+      params.set("returnPath", returnPath);
+    }
+
     window.history.replaceState(
       null,
       "",
@@ -154,71 +139,129 @@ export default function LoginPage() {
 
     setPageMeta({
       title: `${profile.title} | Acesso RED Registro Escolar Digital`,
-      description: `Entre no RED como ${profile.title.toLowerCase()} e continue para o painel específico da sua rotina escolar.`,
+      description: `Acesse o RED como ${profile.title.toLowerCase()} com autenticação real para operação escolar em produção.`,
     });
-  }, [profile.title, selectedProfile]);
+  }, [pageParams, profile.title, returnPath, selectedProfile]);
 
-  const handleLogin = () => {
-    if (!isLoginReady) {
-      setLoginMessage("Preencha os campos de login antes de continuar.");
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || hash.length <= 1) return;
+
+    const hashParams = new URLSearchParams(hash.slice(1));
+    const accessToken = hashParams.get("access_token");
+    if (!accessToken) return;
+
+    let aborted = false;
+
+    const finalizeOAuth = async () => {
+      setIsOAuthFinalizing(true);
+      setLoginMessage(null);
+
+      try {
+        const response = await fetch("/api/auth/supabase/session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            accessToken,
+            profile: selectedProfile,
+            returnPath,
+          }),
+        });
+
+        const payload = (await response.json()) as LoginPayload;
+
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error || "Falha ao finalizar OAuth.");
+        }
+
+        if (!aborted) {
+          window.history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}?profile=${selectedProfile}&returnPath=${encodeURIComponent(returnPath)}`
+          );
+
+          window.location.href = payload.redirectTo || returnPath;
+        }
+      } catch (error) {
+        if (!aborted) {
+          setLoginMessage(
+            error instanceof Error
+              ? error.message
+              : "Nao foi possivel concluir o login OAuth."
+          );
+        }
+      } finally {
+        if (!aborted) {
+          setIsOAuthFinalizing(false);
+        }
+      }
+    };
+
+    void finalizeOAuth();
+
+    return () => {
+      aborted = true;
+    };
+  }, [returnPath, selectedProfile]);
+
+  const handlePasswordLogin = async () => {
+    if (!isLoginReady || isOAuthFinalizing) {
       return;
     }
 
-    const params = new URLSearchParams();
-    params.set("profile", selectedProfile);
-
-    profileInputConfig[selectedProfile].forEach(field => {
-      const value = formValues[field.key]?.trim();
-      if (value) {
-        params.set(field.key, value);
-      }
-    });
-
+    setIsPasswordLoading(true);
     setLoginMessage(null);
-    window.location.href = getLoginUrl(
-      `${profile.dashboardPath}?${params.toString()}`
-    );
-  };
-
-  const handleDemoLogin = async () => {
-    const demoValues = demoValuesByProfile[selectedProfile];
-    setFormValues(prev => ({ ...prev, ...demoValues }));
-    setLoginMessage(null);
-    setIsDemoLoading(true);
 
     try {
-      const response = await fetch("/api/auth/demo-login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
         body: JSON.stringify({
+          email: email.trim(),
+          password,
           profile: selectedProfile,
-          returnPath: `${profile.dashboardPath}?profile=${selectedProfile}&mode=demo`,
-          loginFields: demoValues,
+          returnPath,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Falha no login demo");
+      const payload = (await response.json()) as LoginPayload;
+
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Falha no login com senha.");
       }
 
-      const payload = (await response.json()) as {
-        success: boolean;
-        redirectTo?: string;
-      };
-
-      window.location.href =
-        payload.redirectTo ??
-        `${profile.dashboardPath}?profile=${selectedProfile}&mode=demo`;
-    } catch (_error) {
+      window.location.href = payload.redirectTo || returnPath;
+    } catch (error) {
       setLoginMessage(
-        "Nao foi possivel entrar no modo demo agora. Tente novamente em instantes."
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel autenticar com email e senha."
       );
     } finally {
-      setIsDemoLoading(false);
+      setIsPasswordLoading(false);
     }
+  };
+
+  const handleOAuthStart = (provider: "google") => {
+    if (isPasswordLoading || isOAuthFinalizing) return;
+
+    setIsOAuthLoading(true);
+    setLoginMessage(null);
+
+    const params = new URLSearchParams({
+      provider,
+      profile: selectedProfile,
+      returnPath,
+    });
+
+    window.location.href = `/api/auth/oauth/start?${params.toString()}`;
   };
 
   const handleSelectProfile = (profileId: UserProfile) => {
@@ -254,12 +297,12 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-2xl">
           <div className="mx-auto mb-8 max-w-3xl text-center lg:mb-10">
             <h1 className="font-display text-3xl font-bold leading-[1.05] text-foreground md:text-5xl">
-              Escolha como você vai entrar na plataforma.
+              Acesse com autenticação real.
             </h1>
 
             <p className="mx-auto mt-4 max-w-2xl font-body text-sm leading-relaxed text-muted-foreground md:text-base">
-              O acesso foi ajustado para preservar a identidade do RED e
-              conduzir você para o painel certo desde o primeiro clique.
+              Fluxo pronto para produção com Supabase Auth, sessão segura no
+              backend e perfil autorizado no dashboard.
             </p>
           </div>
 
@@ -293,7 +336,7 @@ export default function LoginPage() {
                     }}
                     className="rounded-lg border border-border px-3 py-1.5 font-heading text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
                   >
-                    {isProfilePickerOpen ? "Fechar" : "Alterar login"}
+                    {isProfilePickerOpen ? "Fechar" : "Trocar perfil"}
                   </button>
                 </div>
 
@@ -340,100 +383,101 @@ export default function LoginPage() {
                     </div>
                   </div>
                 ) : null}
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {[
-                    "Autenticação OAuth segura",
-                    "Redirecionamento para o painel correto",
-                    "Contexto preservado por perfil",
-                  ].map(feature => (
-                    <span
-                      key={feature}
-                      className="rounded-full border border-border bg-background/70 px-3 py-1.5 font-body text-[11px] text-muted-foreground"
-                    >
-                      {feature}
-                    </span>
-                  ))}
-                </div>
               </div>
             </div>
 
             <h2 className="mt-6 font-heading text-2xl font-bold text-foreground md:text-3xl">
-              Continue para entrar com segurança.
+              Entre com email e senha
             </h2>
             <p className="mt-3 font-body text-sm leading-relaxed text-muted-foreground md:text-base">
-              Depois do OAuth, você retorna diretamente ao painel associado ao
-              seu perfil atual.
+              Sessão assinada no servidor e controle de perfil aplicado a partir
+              da identidade persistida no banco.
             </p>
 
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4 sm:p-5">
               <h3 className="font-heading text-base font-semibold text-foreground">
-                Dados de login
+                Credenciais
               </h3>
-              <p className="mt-1 font-body text-xs text-muted-foreground">
-                Preencha estes dados para continuar no fluxo de autenticação
-                OAuth com o perfil selecionado.
-              </p>
 
               <div className="mt-4 space-y-3">
-                {currentLoginFields.map(field => (
-                  <label key={field.key} className="block">
-                    <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
-                      {field.label}
-                    </span>
-                    <input
-                      type={field.type ?? "text"}
-                      value={formValues[field.key] ?? ""}
-                      onChange={event =>
-                        setFormValues(prev => ({
-                          ...prev,
-                          [field.key]: event.target.value,
-                        }))
-                      }
-                      placeholder={field.placeholder}
-                      className="w-full rounded-lg border border-border bg-background/90 px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-red-brand/60"
-                    />
-                  </label>
-                ))}
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-2 font-body text-xs font-medium text-muted-foreground">
+                    <Mail size={13} />
+                    Email Institucional
+                  </span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={event => setEmail(event.target.value)}
+                    placeholder="usuario@escola.edu.br"
+                    autoComplete="email"
+                    className="w-full rounded-lg border border-border bg-background/90 px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-red-brand/60"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-2 font-body text-xs font-medium text-muted-foreground">
+                    <Lock size={13} />
+                    Senha
+                  </span>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={event => setPassword(event.target.value)}
+                    placeholder="Digite sua senha"
+                    autoComplete="current-password"
+                    className="w-full rounded-lg border border-border bg-background/90 px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-red-brand/60"
+                  />
+                </label>
               </div>
             </div>
 
             <button
-              onClick={handleLogin}
-              disabled={!isLoginReady || isDemoLoading}
-              className={`group mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${profile.accentClassName} px-6 py-4 font-heading text-sm font-semibold text-white shadow-lg shadow-black/15 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-2xl`}
+              onClick={handlePasswordLogin}
+              disabled={!isLoginReady || isPasswordLoading || isOAuthFinalizing}
+              className={`group mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${profile.accentClassName} px-6 py-4 font-heading text-sm font-semibold text-white shadow-lg shadow-black/15 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-2xl disabled:cursor-not-allowed disabled:opacity-70`}
             >
               <LogIn size={18} />
-              Entrar como {profile.title}
+              {isPasswordLoading
+                ? "Validando credenciais..."
+                : `Entrar como ${profile.title}`}
               <ArrowRight
                 size={16}
                 className="transition-transform group-hover:translate-x-1"
               />
             </button>
 
-            <button
-              onClick={handleDemoLogin}
-              disabled={isDemoLoading}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card/70 px-6 py-3 font-heading text-sm font-semibold text-foreground transition-colors hover:bg-muted/40 disabled:opacity-70"
-            >
-              <Sparkles size={16} />
-              {isDemoLoading ? "Entrando no modo demo..." : "Entrar como demo"}
-            </button>
+            <div className="mt-4">
+              <button
+                onClick={() => handleOAuthStart("google")}
+                disabled={
+                  isOAuthLoading || isPasswordLoading || isOAuthFinalizing
+                }
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card/80 px-4 py-3 font-heading text-sm font-semibold text-foreground transition-colors hover:bg-muted/40 disabled:opacity-70"
+              >
+                <span className="inline-flex h-5 w-5 items-center justify-center">
+                  <GoogleLogo />
+                </span>
+                {isOAuthLoading
+                  ? "Redirecionando para Google..."
+                  : "Entrar com Google"}
+              </button>
+            </div>
+
+            {isOAuthFinalizing ? (
+              <p className="mt-3 font-body text-xs text-blue-brand">
+                Finalizando sessão OAuth com o servidor...
+              </p>
+            ) : null}
 
             {loginMessage ? (
               <p className="mt-3 font-body text-xs text-red-brand">
                 {loginMessage}
               </p>
             ) : null}
-
-            <p className="mt-5 font-body text-xs text-muted-foreground">
-              Você será redirecionado para autenticação segura via OAuth antes
-              de acessar o painel do RED.
-            </p>
           </section>
         </div>
       </main>
     </div>
   );
 }
-

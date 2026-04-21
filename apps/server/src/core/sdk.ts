@@ -35,11 +35,6 @@ const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserI
 class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {
     console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
-    if (!ENV.oAuthServerUrl) {
-      console.error(
-        "[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable."
-      );
-    }
   }
 
   private decodeState(state: string): string {
@@ -269,27 +264,18 @@ class SDKServer {
     const sessionUserId = session.openId;
     const signedInAt = new Date();
 
-    if (sessionUserId.startsWith("demo-")) {
-      const existingDemoUser = await db.getUserByOpenId(sessionUserId);
-      if (existingDemoUser) {
-        return existingDemoUser;
-      }
-
-      return {
-        id: 0,
-        openId: session.openId,
-        name: session.name,
-        email: null,
-        loginMethod: "demo",
-        role: "user",
-        defaultProfile: null,
-        createdAt: signedInAt,
-        updatedAt: signedInAt,
-        lastSignedIn: signedInAt,
-      };
-    }
-
     let user = await db.getUserByOpenId(sessionUserId);
+
+    if (!user && sessionUserId.startsWith("supabase:")) {
+      await db.upsertUser({
+        openId: sessionUserId,
+        name: session.name,
+        loginMethod: "supabase",
+        lastSignedIn: signedInAt,
+      });
+
+      user = await db.getUserByOpenId(sessionUserId);
+    }
 
     // If user not in DB, sync from OAuth server automatically
     if (!user) {

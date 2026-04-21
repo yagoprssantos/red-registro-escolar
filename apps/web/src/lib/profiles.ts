@@ -31,7 +31,7 @@ const profileConfigs: Record<UserProfile, ProfileConfig> = {
     accentClassName: "from-sky-600 to-blue-700",
     softAccentClassName: "from-sky-500/15 to-blue-700/10",
     icon: Users,
-    dashboardPath: "/teacher-dashboard",
+    dashboardPath: "/dashboard",
   },
   student: {
     id: "student",
@@ -40,7 +40,7 @@ const profileConfigs: Record<UserProfile, ProfileConfig> = {
     accentClassName: "from-emerald-600 to-green-700",
     softAccentClassName: "from-emerald-500/15 to-green-700/10",
     icon: User,
-    dashboardPath: "/student-dashboard",
+    dashboardPath: "/dashboard",
   },
   guardian: {
     id: "guardian",
@@ -49,7 +49,7 @@ const profileConfigs: Record<UserProfile, ProfileConfig> = {
     accentClassName: "from-violet-600 to-purple-700",
     softAccentClassName: "from-violet-500/15 to-purple-700/10",
     icon: Heart,
-    dashboardPath: "/guardian-dashboard",
+    dashboardPath: "/dashboard",
   },
 };
 
@@ -87,4 +87,3 @@ export const buildLoginHref = (profile: UserProfile, source?: string) => {
 
   return `${url.pathname}${url.search}`;
 };
-

@@ -137,8 +137,11 @@ JWT_SECRET=red-local-dev-super-secret-123
 
 Sobre variaveis opcionais:
 
-- `OAUTH_SERVER_URL`: necessario apenas para fluxo de login OAuth real.
-- `DATABASE_URL`: necessario para recursos que dependem de MySQL real e migracoes.
+- `DATABASE_URL`: conexao PostgreSQL (Supabase).
+- `SUPABASE_URL`: URL do projeto Supabase (Auth + API).
+- `SUPABASE_ANON_KEY`: chave anon para login real (senha e OAuth).
+- `SUPABASE_SERVICE_ROLE_KEY`: opcional para provisionamento administrativo.
+- `AUTH_BOOTSTRAP_DEFAULT_ADMINS` e `AUTH_DEFAULT_ADMIN_PASSWORD`: opcionais para criar usuarios padrao por perfil no boot.
 
 ## 6) Subir a aplicacao em desenvolvimento
 
@@ -175,20 +178,19 @@ Testes automatizados:
 pnpm test
 ```
 
-## 8) Setup completo opcional (MySQL + OAuth)
+## 8) Setup completo opcional (Supabase Auth + PostgreSQL)
 
 Use esta secao se voce quer o fluxo completo alem do modo local basico.
 
-### 8.1) Banco MySQL
+### 8.1) Banco PostgreSQL (Supabase)
 
-1. Instale MySQL.
-1. Crie um banco, por exemplo `red_registro_escolar`.
-1. Configure `DATABASE_URL` no `.env`.
+1. Crie um projeto no Supabase.
+1. Configure `DATABASE_URL` no `.env` com a URI Postgres do projeto.
 
 Exemplo:
 
 ```text
-DATABASE_URL=mysql://usuario:senha@localhost:3306/red_registro_escolar
+DATABASE_URL=postgresql://postgres:<SENHA>@db.<PROJECT_REF>.supabase.co:5432/postgres
 ```
 
 1. Rode migracoes:
@@ -197,14 +199,20 @@ DATABASE_URL=mysql://usuario:senha@localhost:3306/red_registro_escolar
 pnpm run db:push
 ```
 
-### 8.2) OAuth
+### 8.2) Auth real (senha + OAuth)
 
 Configure no `.env`:
 
-- `OAUTH_SERVER_URL`
-- `OWNER_OPEN_ID` (quando aplicavel)
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
 
-Sem isso, o sistema pode subir normalmente em modo local, mas o login OAuth real nao fica funcional.
+Opcional para bootstrap automatico de contas administrativas por perfil:
+
+- `AUTH_BOOTSTRAP_DEFAULT_ADMINS=true`
+- `AUTH_DEFAULT_ADMIN_PASSWORD=<senha-forte>`
+- emails padrao `AUTH_DEFAULT_*_ADMIN_EMAIL`
+
+Sem `SUPABASE_URL` e `SUPABASE_ANON_KEY`, o app sobe, mas o login real nao fica funcional.
 
 ## 9) Solucao de problemas comuns
 
@@ -223,9 +231,9 @@ Feche e reabra o terminal.
 
 Nao e erro fatal. O servidor escolhe outra porta e mostra no log (ex.: `3001`).
 
-### Aviso de `OAUTH_SERVER_URL` ausente
+### Aviso de `SUPABASE_URL` ou `SUPABASE_ANON_KEY` ausente
 
-Esperado no setup basico. So e obrigatorio para login OAuth real.
+Esperado apenas se voce nao vai validar login real. Para login de mercado, ambos sao obrigatorios.
 
 ### `pnpm install` falha com cache corrompido
 

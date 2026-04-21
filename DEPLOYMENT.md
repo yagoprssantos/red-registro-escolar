@@ -30,13 +30,21 @@ Use an existing Render Web Service connected to this repository.
 - `JWT_SECRET=<strong-random-secret>`
 - `VITE_APP_ID=red-registro-escolar`
 - `DATABASE_URL=postgresql://postgres:<PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres`
+- `SUPABASE_URL=https://<PROJECT_REF>.supabase.co`
+- `SUPABASE_ANON_KEY=<supabase-anon-key>`
 
 ### Render Optional Environment Variables
 
-- `OAUTH_SERVER_URL=<oauth-url>`
 - `OWNER_OPEN_ID=<owner-open-id>`
 - `BUILT_IN_FORGE_API_URL=<internal-service-url>`
 - `BUILT_IN_FORGE_API_KEY=<internal-service-key>`
+- `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
+- `AUTH_BOOTSTRAP_DEFAULT_ADMINS=true`
+- `AUTH_DEFAULT_ADMIN_PASSWORD=<strong-password>`
+- `AUTH_DEFAULT_SCHOOL_ADMIN_EMAIL=<email>`
+- `AUTH_DEFAULT_TEACHER_ADMIN_EMAIL=<email>`
+- `AUTH_DEFAULT_STUDENT_ADMIN_EMAIL=<email>`
+- `AUTH_DEFAULT_GUARDIAN_ADMIN_EMAIL=<email>`
 
 ### Important Notes for DATABASE_URL
 
@@ -62,7 +70,6 @@ Use an existing Vercel project connected to this repository.
 
 ### Vercel Optional Environment Variables
 
-- `VITE_OAUTH_PORTAL_URL=<oauth-url>`
 - `VITE_ANALYTICS_ENDPOINT=<https://analytics.example.com>`
 - `VITE_ANALYTICS_WEBSITE_ID=<analytics-site-id>`
 
@@ -83,7 +90,7 @@ Run in this exact order after deployment:
 2. Open `https://<vercel-domain>/` and check initial page load.
 3. Test an API call through Vercel rewrite:
    - `https://<vercel-domain>/api/trpc/system.health` (POST request from app flow)
-4. Execute demo login from frontend and confirm session creation.
+4. Execute real login with email/senha from frontend and confirm session cookie creation.
 5. Submit contact form and verify backend persistence.
 
 ## 5) Common Problems
@@ -106,6 +113,6 @@ Run in this exact order after deployment:
 ## 6) Suggested Production Hardening
 
 - Rotate `JWT_SECRET` periodically.
-- Restrict OAuth callback domains to your Vercel production domain.
+- Restrict Supabase Auth redirect URLs to approved production domains.
 - Enable Supabase backups and monitor slow queries.
 - Add uptime monitor for `/healthz`.
