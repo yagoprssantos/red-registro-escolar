@@ -19,12 +19,15 @@ import {
   getSchoolContacts,
   getUserSchools,
   linkStudentGuardian,
+  upsertUser,
 } from "./db";
 import { profilesRouter } from "./profiles";
+import { registryRouter } from "./registry";
 
 export const appRouter = router({
   system: systemRouter,
   profiles: profilesRouter,
+  registry: registryRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -310,6 +313,29 @@ export const appRouter = router({
                 positionTitle: "Administrador",
               });
             }
+
+            const identityByPosition =
+              input.professionalData.position === "teacher"
+                ? {
+                    role: "teacher" as const,
+                    defaultProfile: "teacher" as const,
+                  }
+                : input.professionalData.position === "guardian"
+                  ? {
+                      role: "guardian" as const,
+                      defaultProfile: "guardian" as const,
+                    }
+                  : {
+                      role: "school_staff" as const,
+                      defaultProfile: "school" as const,
+                    };
+
+            await upsertUser({
+              openId: ctx.user.openId,
+              role: identityByPosition.role,
+              defaultProfile: identityByPosition.defaultProfile,
+              lastSignedIn: new Date(),
+            });
           }
 
           return {

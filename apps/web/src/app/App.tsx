@@ -10,11 +10,6 @@ import NotFound from "./routes/pages/NotFound";
 const ProfileSelector = lazy(() => import("./routes/pages/ProfileSelector"));
 const LoginPage = lazy(() => import("./routes/pages/LoginPage"));
 const Dashboard = lazy(() => import("./routes/pages/Dashboard"));
-const TeacherDashboard = lazy(() => import("./routes/pages/TeacherDashboard"));
-const StudentDashboard = lazy(() => import("./routes/pages/StudentDashboard"));
-const GuardianDashboard = lazy(
-  () => import("./routes/pages/GuardianDashboard")
-);
 const Onboarding = lazy(() => import("./routes/pages/Onboarding"));
 const PrivacyPolicy = lazy(() => import("./routes/pages/legal/PrivacyPolicy"));
 const TermsOfUse = lazy(() => import("./routes/pages/legal/TermsOfUse"));
@@ -59,17 +54,17 @@ function Router() {
       </Route>
       <Route path={"/teacher-dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
-          <TeacherDashboard />
+          <Dashboard />
         </Suspense>
       </Route>
       <Route path={"/student-dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
-          <StudentDashboard />
+          <Dashboard />
         </Suspense>
       </Route>
       <Route path={"/guardian-dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
-          <GuardianDashboard />
+          <Dashboard />
         </Suspense>
       </Route>
       <Route path={"/onboarding"}>

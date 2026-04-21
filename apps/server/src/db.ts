@@ -1,29 +1,49 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
   assessments,
   assessmentScores,
+  Attachment,
+  attachments,
   AttendanceRecord,
   attendanceRecords,
   Class,
   classEnrollments,
   classes,
+  classSessions,
   classSubjects,
   classTeachers,
   Communication,
+  CommunicationRecipient,
   communicationRecipients,
   communications,
   Contact,
   contacts,
+  EventTarget,
+  eventTargets,
   Guardian,
   guardians,
   InsertContact,
   InsertSchool,
   InsertUser,
   InsertUserSchool,
+  Notification,
+  notifications,
   School,
+  SchoolEvent,
+  schoolEvents,
   schools,
+  SchoolStaffProfile,
   schoolStaffProfiles,
   schoolYears,
   Student,
@@ -51,6 +71,7 @@ type MemoryStore = {
   contacts: Contact[];
   schools: School[];
   userSchools: UserSchool[];
+  schoolStaffProfiles: SchoolStaffProfile[];
   schoolYears: Array<{
     id: number;
     schoolId: number;
@@ -136,14 +157,11 @@ type MemoryStore = {
     updatedAt: Date;
   }>;
   communications: Communication[];
-  communicationRecipients: Array<{
-    id: number;
-    communicationId: number;
-    recipientType: "student" | "guardian" | "teacher" | "staff";
-    recipientRefId: number;
-    readAt: Date | null;
-    createdAt: Date;
-  }>;
+  communicationRecipients: CommunicationRecipient[];
+  schoolEvents: SchoolEvent[];
+  eventTargets: EventTarget[];
+  notifications: Notification[];
+  attachments: Attachment[];
 };
 
 const memory: MemoryStore = {
@@ -151,6 +169,7 @@ const memory: MemoryStore = {
   contacts: [],
   schools: [],
   userSchools: [],
+  schoolStaffProfiles: [],
   schoolYears: [],
   teachers: [],
   students: [],
@@ -168,6 +187,10 @@ const memory: MemoryStore = {
   studentComments: [],
   communications: [],
   communicationRecipients: [],
+  schoolEvents: [],
+  eventTargets: [],
+  notifications: [],
+  attachments: [],
 };
 
 const memoryIds = {
@@ -175,6 +198,7 @@ const memoryIds = {
   contacts: 1,
   schools: 1,
   userSchools: 1,
+  schoolStaffProfiles: 1,
   schoolYears: 1,
   teachers: 1,
   students: 1,
@@ -192,6 +216,10 @@ const memoryIds = {
   studentComments: 1,
   communications: 1,
   communicationRecipients: 1,
+  schoolEvents: 1,
+  eventTargets: 1,
+  notifications: 1,
+  attachments: 1,
 };
 
 export function resetMemoryStore() {
@@ -200,6 +228,7 @@ export function resetMemoryStore() {
     contacts: [],
     schools: [],
     userSchools: [],
+    schoolStaffProfiles: [],
     schoolYears: [],
     teachers: [],
     students: [],
@@ -217,6 +246,10 @@ export function resetMemoryStore() {
     studentComments: [],
     communications: [],
     communicationRecipients: [],
+    schoolEvents: [],
+    eventTargets: [],
+    notifications: [],
+    attachments: [],
   });
 
   Object.keys(memoryIds).forEach(key => {
@@ -904,14 +937,28 @@ export async function createSchoolStaffProfile(input: {
   positionTitle?: string | null;
 }) {
   if (useMemoryStore()) {
-    const existing = memory.userSchools.find(
-      us => us.userId === input.userId && us.schoolId === input.schoolId
+    const existingProfile = memory.schoolStaffProfiles.find(
+      profile =>
+        profile.userId === input.userId &&
+        profile.schoolId === input.schoolId &&
+        profile.role === input.role
     );
-    if (existing) {
-      return existing;
+    if (existingProfile) {
+      return existingProfile;
     }
 
-    const created: UserSchool = {
+    const createdProfile: SchoolStaffProfile = {
+      id: memoryIds.schoolStaffProfiles++,
+      userId: input.userId,
+      schoolId: input.schoolId,
+      role: input.role,
+      positionTitle: input.positionTitle ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    memory.schoolStaffProfiles.push(createdProfile);
+
+    const createdUserSchool: UserSchool = {
       id: memoryIds.userSchools++,
       userId: input.userId,
       schoolId: input.schoolId,
@@ -923,8 +970,8 @@ export async function createSchoolStaffProfile(input: {
             : "admin",
       createdAt: new Date(),
     };
-    memory.userSchools.push(created);
-    return created;
+    memory.userSchools.push(createdUserSchool);
+    return createdProfile;
   }
 
   const db = await getDb();
@@ -1854,4 +1901,726 @@ async function getStudentGradesForStudentId(studentId: number) {
     grade: Number(row.grade),
     date: row.date,
   }));
+}
+
+const entityTableMap = {
+  users,
+  schools,
+  schoolYears,
+  userSchools,
+  schoolStaffProfiles,
+  teachers,
+  students,
+  guardians,
+  studentGuardians,
+  contacts,
+  subjects,
+  classes,
+  classSubjects,
+  classTeachers,
+  classEnrollments,
+  classSessions,
+  attendanceRecords,
+  assessments,
+  assessmentScores,
+  studentComments,
+  schoolEvents,
+  eventTargets,
+  communications,
+  communicationRecipients,
+  notifications,
+  attachments,
+} as const;
+
+export type RegistryEntityName = keyof typeof entityTableMap;
+
+type RegistryFilterValue =
+  | string
+  | number
+  | boolean
+  | Date
+  | null
+  | Array<string | number | boolean>;
+
+type RegistryFilters = Record<string, RegistryFilterValue | undefined>;
+
+type RegistryListParams = {
+  limit?: number;
+  offset?: number;
+  filters?: RegistryFilters;
+  orderBy?: string;
+  orderDirection?: "asc" | "desc";
+};
+
+function toInt(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.trunc(parsed);
+  }
+  return null;
+}
+
+function getMemoryStoreByEntity(
+  entity: RegistryEntityName
+): Array<Record<string, unknown>> {
+  switch (entity) {
+    case "users":
+      return memory.users as Array<Record<string, unknown>>;
+    case "schools":
+      return memory.schools as Array<Record<string, unknown>>;
+    case "schoolYears":
+      return memory.schoolYears as Array<Record<string, unknown>>;
+    case "userSchools":
+      return memory.userSchools as Array<Record<string, unknown>>;
+    case "schoolStaffProfiles":
+      return memory.schoolStaffProfiles as Array<Record<string, unknown>>;
+    case "teachers":
+      return memory.teachers as Array<Record<string, unknown>>;
+    case "students":
+      return memory.students as Array<Record<string, unknown>>;
+    case "guardians":
+      return memory.guardians as Array<Record<string, unknown>>;
+    case "studentGuardians":
+      return memory.studentGuardians as Array<Record<string, unknown>>;
+    case "contacts":
+      return memory.contacts as Array<Record<string, unknown>>;
+    case "subjects":
+      return memory.subjects as Array<Record<string, unknown>>;
+    case "classes":
+      return memory.classes as Array<Record<string, unknown>>;
+    case "classSubjects":
+      return memory.classSubjects as Array<Record<string, unknown>>;
+    case "classTeachers":
+      return memory.classTeachers as Array<Record<string, unknown>>;
+    case "classEnrollments":
+      return memory.classEnrollments as Array<Record<string, unknown>>;
+    case "classSessions":
+      return memory.classSessions as Array<Record<string, unknown>>;
+    case "attendanceRecords":
+      return memory.attendanceRecords as Array<Record<string, unknown>>;
+    case "assessments":
+      return memory.assessments as Array<Record<string, unknown>>;
+    case "assessmentScores":
+      return memory.assessmentScores as Array<Record<string, unknown>>;
+    case "studentComments":
+      return memory.studentComments as Array<Record<string, unknown>>;
+    case "schoolEvents":
+      return memory.schoolEvents as Array<Record<string, unknown>>;
+    case "eventTargets":
+      return memory.eventTargets as Array<Record<string, unknown>>;
+    case "communications":
+      return memory.communications as Array<Record<string, unknown>>;
+    case "communicationRecipients":
+      return memory.communicationRecipients as Array<Record<string, unknown>>;
+    case "notifications":
+      return memory.notifications as Array<Record<string, unknown>>;
+    case "attachments":
+      return memory.attachments as Array<Record<string, unknown>>;
+    default: {
+      const exhaustive: never = entity;
+      throw new Error(`Unsupported entity: ${String(exhaustive)}`);
+    }
+  }
+}
+
+function hasColumn(entity: RegistryEntityName, column: string) {
+  const columns = getTableColumns(entityTableMap[entity]);
+  return Object.prototype.hasOwnProperty.call(columns, column);
+}
+
+function sanitizeEntityPayload(
+  entity: RegistryEntityName,
+  payload: Record<string, unknown>,
+  options: { isUpdate: boolean }
+) {
+  const columns = getTableColumns(entityTableMap[entity]);
+  const allowed = new Set(Object.keys(columns));
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(payload)) {
+    if (!allowed.has(key)) continue;
+    if (options.isUpdate && key === "id") continue;
+    sanitized[key] = value;
+  }
+
+  return sanitized;
+}
+
+function applyMemoryEntityDefaults(
+  entity: RegistryEntityName,
+  row: Record<string, unknown>
+) {
+  const withDefault = <T>(key: string, value: T) => {
+    if (row[key] === undefined) {
+      row[key] = value;
+    }
+  };
+
+  switch (entity) {
+    case "users":
+      withDefault("role", "user");
+      break;
+    case "schools":
+      withDefault("status", "trial");
+      break;
+    case "schoolYears":
+      withDefault("isCurrent", 0);
+      break;
+    case "userSchools":
+      withDefault("role", "coordinator");
+      break;
+    case "teachers":
+      withDefault("active", 1);
+      break;
+    case "students":
+      withDefault("status", "ativo");
+      break;
+    case "studentGuardians":
+      withDefault("isPrimary", 0);
+      break;
+    case "contacts":
+      withDefault("status", "novo");
+      break;
+    case "classes":
+      withDefault("shift", "morning");
+      withDefault("status", "ativo");
+      break;
+    case "classEnrollments":
+      withDefault("status", "ativo");
+      break;
+    case "classSessions":
+      withDefault("lessonNumber", 1);
+      break;
+    case "attendanceRecords":
+      withDefault("status", "present");
+      break;
+    case "assessments":
+      withDefault("maxScore", "10.00");
+      withDefault("weight", "1.00");
+      break;
+    case "studentComments":
+      withDefault("category", "comentario");
+      withDefault("visibility", "all");
+      break;
+    case "schoolEvents":
+      withDefault("eventType", "evento_escolar");
+      break;
+    case "communications":
+      withDefault("communicationType", "announcement");
+      break;
+    case "notifications":
+      withDefault("notificationType", "general");
+      withDefault("isRead", 0);
+      break;
+    default:
+      break;
+  }
+}
+
+function rowMatchesFilters(
+  row: Record<string, unknown>,
+  filters: RegistryFilters | undefined
+) {
+  if (!filters) return true;
+
+  return Object.entries(filters).every(([key, value]) => {
+    if (value === undefined) return true;
+    const rowValue = row[key];
+
+    if (Array.isArray(value)) {
+      return value.includes(rowValue as string | number | boolean);
+    }
+
+    return rowValue === value;
+  });
+}
+
+export async function listEntityRows(
+  entity: RegistryEntityName,
+  params: RegistryListParams = {}
+) {
+  const limit = Math.max(1, Math.min(500, params.limit ?? 100));
+  const offset = Math.max(0, params.offset ?? 0);
+  const orderDirection = params.orderDirection ?? "desc";
+
+  if (useMemoryStore()) {
+    const rows = getMemoryStoreByEntity(entity)
+      .filter(row => rowMatchesFilters(row, params.filters))
+      .slice();
+
+    const orderBy =
+      params.orderBy && hasColumn(entity, params.orderBy)
+        ? params.orderBy
+        : hasColumn(entity, "createdAt")
+          ? "createdAt"
+          : "id";
+
+    rows.sort((a, b) => {
+      const aValue = a[orderBy];
+      const bValue = b[orderBy];
+
+      if (aValue === bValue) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+
+      if (aValue instanceof Date && bValue instanceof Date) {
+        return orderDirection === "asc"
+          ? aValue.getTime() - bValue.getTime()
+          : bValue.getTime() - aValue.getTime();
+      }
+
+      return orderDirection === "asc"
+        ? String(aValue).localeCompare(String(bValue))
+        : String(bValue).localeCompare(String(aValue));
+    });
+
+    return rows.slice(offset, offset + limit);
+  }
+
+  const db = await getDb();
+  if (!db) return [];
+
+  const table = entityTableMap[entity] as any;
+  const filters = params.filters ?? {};
+  const conditions: any[] = [];
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined) continue;
+    const column = table[key];
+    if (!column) continue;
+
+    if (value === null) {
+      conditions.push(isNull(column));
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      conditions.push(
+        inArray(column, value as Array<string | number | boolean>)
+      );
+      continue;
+    }
+
+    conditions.push(eq(column, value as any));
+  }
+
+  let query = db.select().from(table) as any;
+
+  if (conditions.length === 1) {
+    query = query.where(conditions[0]);
+  }
+
+  if (conditions.length > 1) {
+    query = query.where(and(...conditions));
+  }
+
+  const orderBy =
+    params.orderBy && table[params.orderBy]
+      ? table[params.orderBy]
+      : table.createdAt
+        ? table.createdAt
+        : table.id;
+
+  query = query.orderBy(
+    orderDirection === "asc" ? asc(orderBy) : desc(orderBy)
+  );
+
+  return await query.limit(limit).offset(offset);
+}
+
+export async function getEntityById(entity: RegistryEntityName, id: number) {
+  if (useMemoryStore()) {
+    return (
+      getMemoryStoreByEntity(entity).find(row => toInt(row.id) === id) ?? null
+    );
+  }
+
+  const db = await getDb();
+  if (!db) return null;
+
+  const table = entityTableMap[entity] as any;
+  const rows = await db.select().from(table).where(eq(table.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createEntityRow(
+  entity: RegistryEntityName,
+  payload: Record<string, unknown>
+) {
+  const data = sanitizeEntityPayload(entity, payload, { isUpdate: false });
+
+  if (Object.keys(data).length === 0) {
+    throw new Error("No valid fields to create entity");
+  }
+
+  const now = new Date();
+
+  if (useMemoryStore()) {
+    const target = getMemoryStoreByEntity(entity);
+    const row: Record<string, unknown> = { ...data };
+
+    applyMemoryEntityDefaults(entity, row);
+
+    if (hasColumn(entity, "id") && (row.id === undefined || row.id === null)) {
+      row.id = (memoryIds as Record<string, number>)[entity]++;
+    }
+
+    if (hasColumn(entity, "createdAt") && row.createdAt === undefined) {
+      row.createdAt = now;
+    }
+
+    if (hasColumn(entity, "updatedAt") && row.updatedAt === undefined) {
+      row.updatedAt = now;
+    }
+
+    target.push(row);
+    return row;
+  }
+
+  const db = await getDb();
+  if (!db) return null;
+
+  const table = entityTableMap[entity] as any;
+
+  if (table.updatedAt && data.updatedAt === undefined) {
+    data.updatedAt = now;
+  }
+
+  const created = await db
+    .insert(table)
+    .values(data as any)
+    .returning();
+  return created[0] ?? null;
+}
+
+export async function updateEntityRow(
+  entity: RegistryEntityName,
+  id: number,
+  payload: Record<string, unknown>
+) {
+  const data = sanitizeEntityPayload(entity, payload, { isUpdate: true });
+
+  if (Object.keys(data).length === 0) {
+    return await getEntityById(entity, id);
+  }
+
+  if (useMemoryStore()) {
+    const target = getMemoryStoreByEntity(entity);
+    const index = target.findIndex(row => toInt(row.id) === id);
+    if (index < 0) return null;
+
+    const next = {
+      ...target[index],
+      ...data,
+      ...(hasColumn(entity, "updatedAt") ? { updatedAt: new Date() } : {}),
+    };
+
+    target[index] = next;
+    return next;
+  }
+
+  const db = await getDb();
+  if (!db) return null;
+
+  const table = entityTableMap[entity] as any;
+  const setPayload = {
+    ...data,
+    ...(table.updatedAt && data.updatedAt === undefined
+      ? { updatedAt: new Date() }
+      : {}),
+  };
+
+  const updated = await db
+    .update(table)
+    .set(setPayload as any)
+    .where(eq(table.id, id))
+    .returning();
+
+  return updated[0] ?? null;
+}
+
+export async function deleteEntityRow(entity: RegistryEntityName, id: number) {
+  if (useMemoryStore()) {
+    const target = getMemoryStoreByEntity(entity);
+    const index = target.findIndex(row => toInt(row.id) === id);
+    if (index < 0) return null;
+    const [removed] = target.splice(index, 1);
+    return removed ?? null;
+  }
+
+  const db = await getDb();
+  if (!db) return null;
+
+  const table = entityTableMap[entity] as any;
+  const deleted = await db.delete(table).where(eq(table.id, id)).returning();
+  return deleted[0] ?? null;
+}
+
+export async function getUserManagedSchoolIds(
+  userId: number
+): Promise<number[]> {
+  if (useMemoryStore()) {
+    return Array.from(
+      new Set(
+        memory.userSchools
+          .filter(link => link.userId === userId)
+          .map(link => link.schoolId)
+      )
+    );
+  }
+
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({ schoolId: userSchools.schoolId })
+    .from(userSchools)
+    .where(eq(userSchools.userId, userId));
+
+  return Array.from(new Set(rows.map(row => row.schoolId)));
+}
+
+export async function userHasSchoolAccess(
+  userId: number,
+  schoolId: number
+): Promise<boolean> {
+  const schoolIds = await getUserManagedSchoolIds(userId);
+  return schoolIds.includes(schoolId);
+}
+
+export async function resolveEntitySchoolId(
+  entity: RegistryEntityName,
+  row: Record<string, unknown> | null
+): Promise<number | null> {
+  if (!row) return null;
+
+  switch (entity) {
+    case "schools":
+      return toInt(row.id);
+    case "schoolYears":
+    case "userSchools":
+    case "schoolStaffProfiles":
+    case "teachers":
+    case "students":
+    case "guardians":
+    case "subjects":
+    case "classes":
+    case "studentComments":
+    case "schoolEvents":
+    case "communications":
+      return toInt(row.schoolId);
+    case "contacts":
+      return toInt(row.schoolId);
+    case "studentGuardians": {
+      const studentId = toInt(row.studentId);
+      if (!studentId) return null;
+      const student = (await getEntityById("students", studentId)) as Record<
+        string,
+        unknown
+      > | null;
+      return toInt(student?.schoolId);
+    }
+    case "classSubjects": {
+      const classId = toInt(row.classId);
+      if (!classId) return null;
+      const classRow = (await getEntityById("classes", classId)) as Record<
+        string,
+        unknown
+      > | null;
+      return toInt(classRow?.schoolId);
+    }
+    case "classTeachers": {
+      const classSubjectId = toInt(row.classSubjectId);
+      if (!classSubjectId) return null;
+      const classSubject = (await getEntityById(
+        "classSubjects",
+        classSubjectId
+      )) as Record<string, unknown> | null;
+      return await resolveEntitySchoolId("classSubjects", classSubject);
+    }
+    case "classEnrollments": {
+      const classId = toInt(row.classId);
+      if (!classId) return null;
+      const classRow = (await getEntityById("classes", classId)) as Record<
+        string,
+        unknown
+      > | null;
+      return toInt(classRow?.schoolId);
+    }
+    case "classSessions": {
+      const classSubjectId = toInt(row.classSubjectId);
+      if (!classSubjectId) return null;
+      const classSubject = (await getEntityById(
+        "classSubjects",
+        classSubjectId
+      )) as Record<string, unknown> | null;
+      return await resolveEntitySchoolId("classSubjects", classSubject);
+    }
+    case "attendanceRecords": {
+      const classSessionId = toInt(row.classSessionId);
+      if (!classSessionId) return null;
+      const classSessionRow = (await getEntityById(
+        "classSessions",
+        classSessionId
+      )) as Record<string, unknown> | null;
+      return await resolveEntitySchoolId("classSessions", classSessionRow);
+    }
+    case "assessments": {
+      const classSubjectId = toInt(row.classSubjectId);
+      if (!classSubjectId) return null;
+      const classSubject = (await getEntityById(
+        "classSubjects",
+        classSubjectId
+      )) as Record<string, unknown> | null;
+      return await resolveEntitySchoolId("classSubjects", classSubject);
+    }
+    case "assessmentScores": {
+      const assessmentId = toInt(row.assessmentId);
+      if (!assessmentId) return null;
+      const assessment = (await getEntityById(
+        "assessments",
+        assessmentId
+      )) as Record<string, unknown> | null;
+      return await resolveEntitySchoolId("assessments", assessment);
+    }
+    case "eventTargets": {
+      const eventId = toInt(row.eventId);
+      if (!eventId) return null;
+      const event = (await getEntityById("schoolEvents", eventId)) as Record<
+        string,
+        unknown
+      > | null;
+      return toInt(event?.schoolId);
+    }
+    case "communicationRecipients": {
+      const communicationId = toInt(row.communicationId);
+      if (!communicationId) return null;
+      const communication = (await getEntityById(
+        "communications",
+        communicationId
+      )) as Record<string, unknown> | null;
+      return toInt(communication?.schoolId);
+    }
+    case "attachments": {
+      const ownerType = row.ownerType;
+      const ownerId = toInt(row.ownerId);
+      if (!ownerId || typeof ownerType !== "string") return null;
+
+      if (ownerType === "event") {
+        const event = (await getEntityById("schoolEvents", ownerId)) as Record<
+          string,
+          unknown
+        > | null;
+        return toInt(event?.schoolId);
+      }
+
+      if (ownerType === "communication") {
+        const communication = (await getEntityById(
+          "communications",
+          ownerId
+        )) as Record<string, unknown> | null;
+        return toInt(communication?.schoolId);
+      }
+
+      if (ownerType === "comment") {
+        const comment = (await getEntityById(
+          "studentComments",
+          ownerId
+        )) as Record<string, unknown> | null;
+        return toInt(comment?.schoolId);
+      }
+
+      return null;
+    }
+    case "notifications": {
+      const userId = toInt(row.userId);
+      if (!userId) return null;
+      const schoolIds = await getUserManagedSchoolIds(userId);
+      return schoolIds[0] ?? null;
+    }
+    case "users":
+      return null;
+    default: {
+      const exhaustive: never = entity;
+      throw new Error(
+        `Unsupported entity in school resolver: ${String(exhaustive)}`
+      );
+    }
+  }
+}
+
+export async function validateAttachmentOwner(
+  ownerType: "event" | "communication" | "comment",
+  ownerId: number
+) {
+  if (ownerType === "event") {
+    return Boolean(await getEntityById("schoolEvents", ownerId));
+  }
+
+  if (ownerType === "communication") {
+    return Boolean(await getEntityById("communications", ownerId));
+  }
+
+  return Boolean(await getEntityById("studentComments", ownerId));
+}
+
+export async function listNotificationsForUser(
+  userId: number,
+  options: { unreadOnly?: boolean; limit?: number; offset?: number } = {}
+) {
+  const filters: RegistryFilters = { userId };
+  if (options.unreadOnly) {
+    filters.isRead = 0;
+  }
+
+  return await listEntityRows("notifications", {
+    filters,
+    limit: options.limit,
+    offset: options.offset,
+    orderBy: "createdAt",
+    orderDirection: "desc",
+  });
+}
+
+export async function markNotificationAsReadForUser(
+  notificationId: number,
+  userId: number
+) {
+  const current = (await getEntityById(
+    "notifications",
+    notificationId
+  )) as Record<string, unknown> | null;
+
+  if (!current || toInt(current.userId) !== userId) {
+    return null;
+  }
+
+  return await updateEntityRow("notifications", notificationId, {
+    isRead: 1,
+    readAt: new Date(),
+  });
+}
+
+export async function markAllNotificationsAsReadForUser(userId: number) {
+  const notificationsForUser = await listNotificationsForUser(userId, {
+    unreadOnly: true,
+    limit: 500,
+  });
+
+  let updated = 0;
+
+  for (const notification of notificationsForUser) {
+    const id = toInt((notification as Record<string, unknown>).id);
+    if (!id) continue;
+    await updateEntityRow("notifications", id, {
+      isRead: 1,
+      readAt: new Date(),
+    });
+    updated += 1;
+  }
+
+  return { updated };
 }
