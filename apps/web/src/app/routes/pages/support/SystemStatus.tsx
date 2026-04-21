@@ -13,7 +13,7 @@ export default function SystemStatus() {
     <InfoPageLayout
       category="support"
       title="Status do Sistema"
-      description="Painel institucional de disponibilidade dos serviços essenciais da RED, com visão consolidada do estado operacional atual."
+      description="Painel institucional de disponibilidade dos serviços essenciais do RED, com visão consolidada do estado operacional atual."
       updatedAt="18/04/2026"
       owner="Operações de Plataforma RED"
     >
@@ -74,4 +74,3 @@ export default function SystemStatus() {
     </InfoPageLayout>
   );
 }
-

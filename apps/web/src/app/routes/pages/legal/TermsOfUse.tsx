@@ -52,7 +52,7 @@ export default function TermsOfUse() {
           4. Limitação de responsabilidade
         </h2>
         <p className="font-body text-sm text-muted-foreground leading-relaxed">
-          A RED envida esforços razoáveis para manter disponibilidade, segurança
+          O RED envida esforços razoáveis para manter disponibilidade, segurança
           e confiabilidade, sem garantia de operação ininterrupta ou isenta de
           falhas. A responsabilidade da plataforma observa os limites legais
           aplicáveis e a natureza dos serviços contratados.
@@ -73,4 +73,3 @@ export default function TermsOfUse() {
     </InfoPageLayout>
   );
 }
-

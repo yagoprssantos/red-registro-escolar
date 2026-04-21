@@ -69,7 +69,7 @@ function FeedbackSection() {
         </h2>
         <p className="font-body text-sm text-muted-foreground leading-relaxed">
           Encontrou um problema? Tem uma ideia de melhoria? Sua opinião é muito
-          importante para continuarmos melhorando a RED.
+          importante para continuarmos melhorando o RED.
         </p>
       </div>
 
@@ -167,7 +167,7 @@ export default function Documentation() {
     <InfoPageLayout
       category="support"
       title="Documentação & Feedback"
-      description="Guia de referência para implantação e uso da RED. Compartilhe feedback, reporte problemas ou sugira melhorias."
+      description="Guia de referência para implantação e uso do RED. Compartilhe feedback, reporte problemas ou sugira melhorias."
       updatedAt="18/04/2026"
       owner="Produto e Suporte RED"
     >
@@ -193,4 +193,3 @@ export default function Documentation() {
     </InfoPageLayout>
   );
 }
-

@@ -46,7 +46,7 @@ export default function HeroSection() {
           >
             Registro Escolar{" "}
             <span className="italic text-white/90">Digital</span> <br />
-            <span className="inline-block whitespace-nowrap text-white/80 text-2xl sm:text-3xl lg:text-5xl font-normal">
+            <span className="inline-block mt-2 sm:mt-3 text-white/80 text-lg sm:text-2xl lg:text-5xl font-normal leading-snug sm:leading-tight max-w-[22ch] sm:max-w-none">
               que facilita o acompanhamento escolar
             </span>
           </h1>

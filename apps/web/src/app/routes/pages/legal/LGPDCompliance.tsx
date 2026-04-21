@@ -40,8 +40,8 @@ export default function LGPDCompliance() {
           </h2>
           <p className="font-body text-sm text-muted-foreground leading-relaxed">
             A escola e seus responsáveis legais definem finalidades e bases de
-            tratamento conforme sua operação, enquanto a RED atua como provedora
-            tecnológica e apoia a execução segura do serviço, conforme
+            tratamento conforme sua operação, enquanto o RED atua como provedor
+            tecnológico e apoia a execução segura do serviço, conforme
             obrigações contratuais e legais aplicáveis.
           </p>
         </div>
@@ -65,11 +65,10 @@ export default function LGPDCompliance() {
         </h2>
         <p className="font-body text-sm text-muted-foreground leading-relaxed">
           Em caso de incidente de segurança ou demanda de privacidade, utilize
-          os canais oficiais de suporte da RED e da instituição contratante para
+          os canais oficiais de suporte do RED e da instituição contratante para
           registro, triagem e acompanhamento formal.
         </p>
       </section>
     </InfoPageLayout>
   );
 }
-

@@ -5,7 +5,7 @@ export default function PrivacyPolicy() {
     <InfoPageLayout
       category="legal"
       title="Política de Privacidade"
-      description="Documento institucional que descreve como a RED trata dados pessoais no contexto educacional, incluindo finalidades, bases legais, compartilhamentos e direitos dos titulares."
+      description="Documento institucional que descreve como o RED trata dados pessoais no contexto educacional, incluindo finalidades, bases legais, compartilhamentos e direitos dos titulares."
       updatedAt="18/04/2026"
       owner="Governança e Privacidade RED"
     >
@@ -80,7 +80,7 @@ export default function PrivacyPolicy() {
         </h2>
         <p className="font-body text-sm text-muted-foreground leading-relaxed">
           Solicitações relacionadas a privacidade e proteção de dados podem ser
-          enviadas pelos canais oficiais da RED e da instituição contratante. O
+          enviadas pelos canais oficiais do RED e da instituição contratante. O
           atendimento será registrado e respondido em prazo compatível com a
           natureza da demanda e obrigações legais.
         </p>
@@ -88,4 +88,3 @@ export default function PrivacyPolicy() {
     </InfoPageLayout>
   );
 }
-
