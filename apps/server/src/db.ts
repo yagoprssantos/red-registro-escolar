@@ -9,6 +9,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { setDefaultResultOrder } from "node:dns";
 import postgres from "postgres";
 import {
   assessments,
@@ -60,6 +61,10 @@ import {
   userSchools,
 } from "../../../drizzle/schema";
 import { ENV } from "./core/env";
+
+// Render can expose IPv6 records that are unreachable from its runtime network.
+// Prefer IPv4 first to avoid intermittent ENETUNREACH during DB connections.
+setDefaultResultOrder("ipv4first");
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pgClient: postgres.Sql | null = null;

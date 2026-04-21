@@ -394,58 +394,68 @@ export default function LoginPage() {
               da identidade persistida no banco.
             </p>
 
-            <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4 sm:p-5">
-              <h3 className="font-heading text-base font-semibold text-foreground">
-                Credenciais
-              </h3>
-
-              <div className="mt-4 space-y-3">
-                <label className="block">
-                  <span className="mb-1.5 flex items-center gap-2 font-body text-xs font-medium text-muted-foreground">
-                    <Mail size={13} />
-                    Email Institucional
-                  </span>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={event => setEmail(event.target.value)}
-                    placeholder="usuario@escola.edu.br"
-                    autoComplete="email"
-                    className="w-full rounded-lg border border-border bg-background/90 px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-red-brand/60"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1.5 flex items-center gap-2 font-body text-xs font-medium text-muted-foreground">
-                    <Lock size={13} />
-                    Senha
-                  </span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={event => setPassword(event.target.value)}
-                    placeholder="Digite sua senha"
-                    autoComplete="current-password"
-                    className="w-full rounded-lg border border-border bg-background/90 px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-red-brand/60"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <button
-              onClick={handlePasswordLogin}
-              disabled={!isLoginReady || isPasswordLoading || isOAuthFinalizing}
-              className={`group mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${profile.accentClassName} px-6 py-4 font-heading text-sm font-semibold text-white shadow-lg shadow-black/15 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-2xl disabled:cursor-not-allowed disabled:opacity-70`}
+            <form
+              className="mt-6"
+              onSubmit={event => {
+                event.preventDefault();
+                void handlePasswordLogin();
+              }}
             >
-              <LogIn size={18} />
-              {isPasswordLoading
-                ? "Validando credenciais..."
-                : `Entrar como ${profile.title}`}
-              <ArrowRight
-                size={16}
-                className="transition-transform group-hover:translate-x-1"
-              />
-            </button>
+              <div className="rounded-2xl border border-border bg-background/60 p-4 sm:p-5">
+                <h3 className="font-heading text-base font-semibold text-foreground">
+                  Credenciais
+                </h3>
+
+                <div className="mt-4 space-y-3">
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center gap-2 font-body text-xs font-medium text-muted-foreground">
+                      <Mail size={13} />
+                      Email Institucional
+                    </span>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={event => setEmail(event.target.value)}
+                      placeholder="usuario@escola.edu.br"
+                      autoComplete="email"
+                      className="w-full rounded-lg border border-border bg-background/90 px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-red-brand/60"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center gap-2 font-body text-xs font-medium text-muted-foreground">
+                      <Lock size={13} />
+                      Senha
+                    </span>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={event => setPassword(event.target.value)}
+                      placeholder="Digite sua senha"
+                      autoComplete="current-password"
+                      className="w-full rounded-lg border border-border bg-background/90 px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-red-brand/60"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={
+                  !isLoginReady || isPasswordLoading || isOAuthFinalizing
+                }
+                className={`group mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${profile.accentClassName} px-6 py-4 font-heading text-sm font-semibold text-white shadow-lg shadow-black/15 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-2xl disabled:cursor-not-allowed disabled:opacity-70`}
+              >
+                <LogIn size={18} />
+                {isPasswordLoading
+                  ? "Validando credenciais..."
+                  : `Entrar como ${profile.title}`}
+                <ArrowRight
+                  size={16}
+                  className="transition-transform group-hover:translate-x-1"
+                />
+              </button>
+            </form>
 
             <div className="mt-4">
               <button
