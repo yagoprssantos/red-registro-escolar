@@ -4,19 +4,19 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../../../drizzle/schema";
 import {
-  AXIOS_TIMEOUT_MS,
-  COOKIE_NAME,
-  ONE_YEAR_MS,
+    AXIOS_TIMEOUT_MS,
+    COOKIE_NAME,
+    ONE_YEAR_MS,
 } from "../../../../packages/shared/src/const.ts";
 import { ForbiddenError } from "../../../../packages/shared/src/core/errors.ts";
 import * as db from "../db";
 import { ENV } from "./env";
 import type {
-  ExchangeTokenRequest,
-  ExchangeTokenResponse,
-  GetUserInfoResponse,
-  GetUserInfoWithJwtRequest,
-  GetUserInfoWithJwtResponse,
+    ExchangeTokenRequest,
+    ExchangeTokenResponse,
+    GetUserInfoResponse,
+    GetUserInfoWithJwtRequest,
+    GetUserInfoWithJwtResponse,
 } from "./types/oauthTypes";
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
@@ -153,9 +153,30 @@ class SDKServer {
     return new Map(Object.entries(parsed));
   }
 
-  private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+  private getSessionSigningSecret() {
+    const secret = ENV.jwtSigningSecret;
     return new TextEncoder().encode(secret);
+  }
+
+  private getSessionVerificationSecrets() {
+    return ENV.jwtVerificationSecrets.map(secret =>
+      new TextEncoder().encode(secret)
+    );
+  }
+
+  private parseSessionPayload(payload: Record<string, unknown>) {
+    const { openId, appId, name } = payload;
+
+    if (!isNonEmptyString(openId)) {
+      console.warn("[Auth] Session payload missing required field: openId");
+      return null;
+    }
+
+    return {
+      openId,
+      appId: isNonEmptyString(appId) ? appId : ENV.appId,
+      name: isNonEmptyString(name) ? name : "Usuario RED",
+    };
   }
 
   /**
@@ -184,7 +205,7 @@ class SDKServer {
     const issuedAt = Date.now();
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
-    const secretKey = this.getSessionSecret();
+    const secretKey = this.getSessionSigningSecret();
 
     return new SignJWT({
       openId: payload.openId,
@@ -204,27 +225,19 @@ class SDKServer {
       return null;
     }
 
-    try {
-      const secretKey = this.getSessionSecret();
-      const { payload } = await jwtVerify(cookieValue, secretKey, {
-        algorithms: ["HS256"],
-      });
-      const { openId, appId, name } = payload as Record<string, unknown>;
-
-      if (!isNonEmptyString(openId)) {
-        console.warn("[Auth] Session payload missing required field: openId");
-        return null;
+    for (const secretKey of this.getSessionVerificationSecrets()) {
+      try {
+        const { payload } = await jwtVerify(cookieValue, secretKey, {
+          algorithms: ["HS256"],
+        });
+        return this.parseSessionPayload(payload as Record<string, unknown>);
+      } catch {
+        // Try next configured secret (for key rotation compatibility).
       }
-
-      return {
-        openId,
-        appId: isNonEmptyString(appId) ? appId : ENV.appId,
-        name: isNonEmptyString(name) ? name : "Usuario RED",
-      };
-    } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
-      return null;
     }
+
+    console.warn("[Auth] Session verification failed");
+    return null;
   }
 
   async getUserInfoWithJwt(

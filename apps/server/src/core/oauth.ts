@@ -86,6 +86,18 @@ class SupabaseAuthError extends Error {
   }
 }
 
+class ProfileSelectionMismatchError extends Error {
+  requestedProfile: UserProfile;
+  allowedProfile: UserProfile;
+
+  constructor(requestedProfile: UserProfile, allowedProfile: UserProfile) {
+    super("Selected profile does not match authenticated user profile");
+    this.name = "ProfileSelectionMismatchError";
+    this.requestedProfile = requestedProfile;
+    this.allowedProfile = allowedProfile;
+  }
+}
+
 function isUserProfile(value: unknown): value is UserProfile {
   return (
     value === "school" ||
@@ -350,7 +362,11 @@ async function syncLocalUserFromSupabaseUser(options: {
 
   const resolvedProfile = isUserProfile(existingLocalUser?.defaultProfile)
     ? existingLocalUser.defaultProfile
-    : (requestedProfile ?? metadataProfile ?? "school");
+    : (metadataProfile ?? requestedProfile ?? "school");
+
+  if (requestedProfile && requestedProfile !== resolvedProfile) {
+    throw new ProfileSelectionMismatchError(requestedProfile, resolvedProfile);
+  }
 
   const identity = profileToIdentity[resolvedProfile];
   const role =
@@ -739,6 +755,14 @@ export function registerOAuthRoutes(app: Express) {
         ),
       });
     } catch (error) {
+      if (error instanceof ProfileSelectionMismatchError) {
+        res.status(403).json({
+          error:
+            "Nao foi possivel concluir o login com o perfil selecionado. Verifique seus dados e tente novamente.",
+        });
+        return;
+      }
+
       if (error instanceof SupabaseAuthError) {
         const status = error.status === 400 || error.status === 401 ? 401 : 502;
         res.status(status).json({
@@ -803,6 +827,14 @@ export function registerOAuthRoutes(app: Express) {
           ),
         });
       } catch (error) {
+        if (error instanceof ProfileSelectionMismatchError) {
+          res.status(403).json({
+            error:
+              "Nao foi possivel concluir o login com o perfil selecionado. Verifique seus dados e tente novamente.",
+          });
+          return;
+        }
+
         if (error instanceof SupabaseAuthError) {
           const status =
             error.status === 400 || error.status === 401 ? 401 : 502;

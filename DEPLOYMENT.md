@@ -38,6 +38,7 @@ Use an existing Render Web Service connected to this repository.
 - `OWNER_OPEN_ID=<owner-open-id>`
 - `BUILT_IN_FORGE_API_URL=<internal-service-url>`
 - `BUILT_IN_FORGE_API_KEY=<internal-service-key>`
+- `JWT_SECRET_PREVIOUS=<old-secret[,older-secret]>`
 - `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
 - `AUTH_BOOTSTRAP_DEFAULT_ADMINS=true`
 - `AUTH_DEFAULT_ADMIN_PASSWORD=<strong-password>`
@@ -68,12 +69,42 @@ Use an existing Vercel project connected to this repository.
 
 - `VITE_APP_ID=red-registro-escolar`
 
+`JWT_SECRET` nao deve ser configurada no Vercel neste projeto, pois a sessao
+JWT e assinada/validada apenas no backend hospedado no Render.
+
 ### Vercel Optional Environment Variables
 
 - `VITE_ANALYTICS_ENDPOINT=<https://analytics.example.com>`
 - `VITE_ANALYTICS_WEBSITE_ID=<analytics-site-id>`
 
-## 3) Rewrite Config (Vercel -> Render)
+## 3) JWT Secret Hardening and Rotation (Render + Vercel)
+
+### Generate a strong secret
+
+From repository root:
+
+```bash
+pnpm run jwt:secret
+```
+
+Use the output as the new `JWT_SECRET` value.
+
+### Rotation flow without immediate logout
+
+1. Copy current Render `JWT_SECRET` value.
+2. Set new secret as `JWT_SECRET` in Render.
+3. Set old secret as `JWT_SECRET_PREVIOUS` in Render.
+4. Redeploy Render service.
+5. Validate login/session flow.
+6. Keep `JWT_SECRET_PREVIOUS` only for the grace period you need, then remove it and redeploy.
+
+### Vercel action for this repository
+
+1. Remove `JWT_SECRET` and `JWT_SECRET_PREVIOUS` from Vercel Environment Variables.
+2. Keep only frontend `VITE_*` variables in Vercel.
+3. If you ever move the backend to Vercel Functions, add JWT variables there as sensitive secrets.
+
+## 4) Rewrite Config (Vercel -> Render)
 
 The file `vercel.json` already rewrites:
 
@@ -82,7 +113,7 @@ The file `vercel.json` already rewrites:
 
 If your Render domain is different, update the destination in `vercel.json`.
 
-## 4) First-Time Validation Checklist
+## 5) First-Time Validation Checklist
 
 Run in this exact order after deployment:
 
@@ -93,7 +124,7 @@ Run in this exact order after deployment:
 4. Execute real login with email/senha from frontend and confirm session cookie creation.
 5. Submit contact form and verify backend persistence.
 
-## 5) Common Problems
+## 6) Common Problems
 
 ### Render starts but DB fails
 
@@ -110,9 +141,10 @@ Run in this exact order after deployment:
 - Cause: rewrite destination not matching current Render domain.
 - Fix: update `vercel.json` and trigger redeploy.
 
-## 6) Suggested Production Hardening
+## 7) Suggested Production Hardening
 
 - Rotate `JWT_SECRET` periodically.
+- Store production secrets only in provider secret managers (Render Secret Env / Vercel Sensitive Env).
 - Restrict Supabase Auth redirect URLs to approved production domains.
 - Enable Supabase backups and monitor slow queries.
 - Add uptime monitor for `/healthz`.

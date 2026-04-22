@@ -1,5 +1,9 @@
 const isProduction = process.env.NODE_ENV === "production";
 const rawJwtSecret = process.env.JWT_SECRET?.trim() ?? "";
+const rawJwtPreviousSecrets = (process.env.JWT_SECRET_PREVIOUS ?? "")
+  .split(",")
+  .map(value => value.trim())
+  .filter(Boolean);
 const rawAppId = process.env.VITE_APP_ID?.trim() ?? "";
 const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() ?? "";
 const rawSupabaseAnonKey = process.env.SUPABASE_ANON_KEY?.trim() ?? "";
@@ -13,6 +17,9 @@ if (isProduction && !rawJwtSecret) {
 }
 
 const cookieSecret = rawJwtSecret || "red-dev-jwt-secret-local-only-change-me";
+const jwtVerificationSecrets = Array.from(
+  new Set([cookieSecret, ...rawJwtPreviousSecrets])
+);
 const appId = rawAppId || "red-local-app";
 
 if (!isProduction && !rawJwtSecret) {
@@ -42,6 +49,8 @@ const defaultAdminPassword = process.env.AUTH_DEFAULT_ADMIN_PASSWORD ?? "";
 export const ENV = {
   appId,
   cookieSecret,
+  jwtSigningSecret: cookieSecret,
+  jwtVerificationSecrets,
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",

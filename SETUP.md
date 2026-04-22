@@ -129,11 +129,18 @@ Abra o arquivo `.env` e configure no minimo:
 - `JWT_SECRET`
 - `VITE_APP_ID`
 
-Valor sugerido para `JWT_SECRET` (exemplo local):
+Gere um valor forte para `JWT_SECRET`:
 
-```text
-JWT_SECRET=red-local-dev-super-secret-123
+```bash
+pnpm run jwt:secret
 ```
+
+Copie a saida e cole em `JWT_SECRET=<valor-gerado>` no `.env`.
+
+Para rotacao sem derrubar sessoes imediatamente, use tambem `JWT_SECRET_PREVIOUS`
+com a chave antiga (uma ou mais, separadas por virgula).
+
+Nao versione nem compartilhe valores reais de `.env` e `.env.supabase`.
 
 Sobre variaveis opcionais:
 
@@ -198,6 +205,10 @@ DATABASE_URL=postgresql://postgres:<SENHA>@db.<PROJECT_REF>.supabase.co:5432/pos
 ```bash
 pnpm run db:push
 ```
+
+Se voce for usar scripts de seed/limpeza com Supabase Auth, crie tambem um
+arquivo local `.env.supabase` a partir de `.env.supabase.example` e preencha
+somente na sua maquina.
 
 ### 8.2) Auth real (senha + OAuth)
 

@@ -7,6 +7,7 @@
     "dev": "cross-env NODE_ENV=development tsx watch apps/server/src/index.ts",
     "build": "vite build && esbuild apps/server/src/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
+    "jwt:secret": "node --input-type=module -e \"import { randomBytes } from 'node:crypto'; console.log(randomBytes(64).toString('base64'));\"",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
