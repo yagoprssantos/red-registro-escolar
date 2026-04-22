@@ -3,9 +3,10 @@
  * Dashboard para professores com dados reais
  */
 
-import { useAuth } from "@/core/hooks/useAuth";
 import DemoGuideModal from "@/components/DemoGuideModal";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { Spinner } from "@/components/ui/spinner";
+import { useAuth } from "@/core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
   BarChart3,
@@ -55,12 +56,12 @@ export default function TeacherDashboard() {
     }
   }, [isAuthenticated, loading, navigate]);
 
-  if (loading || isLoadingTeacher) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-muted/40 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="font-body text-muted-foreground">Carregando dados...</p>
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+          <Spinner className="size-4" aria-label="Carregando autenticacao" />
+          Carregando dados...
         </div>
       </div>
     );
@@ -82,14 +83,14 @@ export default function TeacherDashboard() {
 
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-40">
-        <div className="container max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="container max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="font-display text-xl font-bold text-white">
                 R
               </span>
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="font-display text-xl font-bold text-foreground">
                 RED
               </h1>
@@ -99,14 +100,16 @@ export default function TeacherDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-4">
             <ThemeToggleButton compact />
-            <div className="text-right">
-              <p className="font-body text-sm font-medium text-foreground">
+            <div className="min-w-0 text-right">
+              <p className="truncate font-body text-sm font-medium text-foreground max-w-[10rem] sm:max-w-[14rem]">
                 {user?.name}
               </p>
-              <p className="font-body text-xs text-muted-foreground">
-                {teacherData?.subject}
+              <p className="truncate font-body text-xs text-muted-foreground max-w-[10rem] sm:max-w-[14rem]">
+                {isLoadingTeacher
+                  ? "Carregando perfil..."
+                  : teacherData?.subject}
               </p>
             </div>
             <button
@@ -115,7 +118,7 @@ export default function TeacherDashboard() {
               className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-muted/40 transition-colors font-body text-sm font-medium text-muted-foreground disabled:opacity-50"
             >
               <LogOut size={16} />
-              Sair
+              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>
@@ -135,18 +138,20 @@ export default function TeacherDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 gap-4 mb-8 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
               icon: Users,
               label: "Turmas",
               value: classes.length.toString(),
+              loading: isLoadingClasses,
               color: "bg-blue-100 text-blue-600",
             },
             {
               icon: BookOpen,
               label: "Alunos",
               value: totalStudents.toString(),
+              loading: isLoadingClasses,
               color: "bg-green-100 text-green-600",
             },
             {
@@ -176,16 +181,23 @@ export default function TeacherDashboard() {
                 <p className="font-body text-xs text-muted-foreground uppercase tracking-wider mb-1">
                   {stat.label}
                 </p>
-                <p className="font-display text-3xl font-bold text-foreground">
-                  {stat.value}
-                </p>
+                {stat.loading ? (
+                  <Spinner
+                    className="size-6 text-muted-foreground"
+                    aria-label={`Carregando ${stat.label.toLowerCase()}`}
+                  />
+                ) : (
+                  <p className="font-display text-3xl font-bold text-foreground">
+                    {stat.value}
+                  </p>
+                )}
               </div>
             );
           })}
         </div>
 
         {/* Main Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
           {/* Turmas */}
           <div className="lg:col-span-2 bg-card rounded-lg shadow-sm p-6">
             <h3 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -255,4 +267,3 @@ export default function TeacherDashboard() {
     </div>
   );
 }
-

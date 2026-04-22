@@ -3,9 +3,10 @@
  * Dashboard para responsáveis com dados reais
  */
 
-import { useAuth } from "@/core/hooks/useAuth";
 import DemoGuideModal from "@/components/DemoGuideModal";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { Spinner } from "@/components/ui/spinner";
+import { useAuth } from "@/core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
   AlertCircle,
@@ -73,12 +74,12 @@ export default function GuardianDashboard() {
     }
   }, [students, selectedStudentId]);
 
-  if (loading || isLoadingGuardian) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-muted/40 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
-          <p className="font-body text-muted-foreground">Carregando dados...</p>
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+          <Spinner className="size-4" aria-label="Carregando autenticacao" />
+          Carregando dados...
         </div>
       </div>
     );
@@ -98,14 +99,14 @@ export default function GuardianDashboard() {
 
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-40">
-        <div className="container max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="container max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
               <span className="font-display text-xl font-bold text-white">
                 R
               </span>
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="font-display text-xl font-bold text-foreground">
                 RED
               </h1>
@@ -115,13 +116,15 @@ export default function GuardianDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-4">
             <ThemeToggleButton compact />
-            <div className="text-right">
-              <p className="font-body text-sm font-medium text-foreground">
+            <div className="min-w-0 text-right">
+              <p className="truncate font-body text-sm font-medium text-foreground max-w-[10rem] sm:max-w-[14rem]">
                 {user?.name}
               </p>
-              <p className="font-body text-xs text-muted-foreground">Pai/Mãe</p>
+              <p className="truncate font-body text-xs text-muted-foreground max-w-[10rem] sm:max-w-[14rem]">
+                {isLoadingGuardian ? "Carregando perfil..." : "Pai/Mãe"}
+              </p>
             </div>
             <button
               onClick={() => logoutMutation.mutate()}
@@ -129,7 +132,7 @@ export default function GuardianDashboard() {
               className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-muted/40 transition-colors font-body text-sm font-medium text-muted-foreground disabled:opacity-50"
             >
               <LogOut size={16} />
-              Sair
+              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>
@@ -161,7 +164,7 @@ export default function GuardianDashboard() {
               </span>
             </div>
           ) : students.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {(students || []).map((filho: any) => (
                 <button
                   key={filho.id}
@@ -204,7 +207,7 @@ export default function GuardianDashboard() {
 
         {/* Main Sections */}
         {selectedStudentId && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
             {/* Desempenho */}
             <div className="lg:col-span-2 bg-card rounded-lg shadow-sm p-6">
               <h3 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -301,6 +304,12 @@ export default function GuardianDashboard() {
           </div>
         )}
 
+        {!selectedStudentId && !isLoadingStudents ? (
+          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+            Selecione um aluno para visualizar as métricas e comunicados.
+          </div>
+        ) : null}
+
         {/* Comunicação */}
         <div className="mt-8 bg-card rounded-lg shadow-sm p-6">
           <h3 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -315,4 +324,3 @@ export default function GuardianDashboard() {
     </div>
   );
 }
-

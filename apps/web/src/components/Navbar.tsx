@@ -6,6 +6,7 @@
 
 import BrandTitleLogo from "@/components/BrandTitleLogo";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { AnimatePresence, motion } from "framer-motion";
 import { LogIn, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -155,79 +156,136 @@ export default function Navbar({
       </div>
 
       {/* Mobile Menu */}
-      {mobileOpen && (
-        <div className="lg:hidden bg-card border-t border-border shadow-lg max-h-[calc(100svh-4.75rem)] overflow-y-auto">
-          <nav
-            id="mobile-main-nav"
-            className="container py-3 flex flex-col gap-1"
+      <AnimatePresence initial={false}>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -12, height: 0 }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              height: "auto",
+              transition: { duration: 0.22, ease: "easeOut" },
+            }}
+            exit={{
+              opacity: 0,
+              y: -12,
+              height: 0,
+              transition: { duration: 0.18, ease: "easeIn" },
+            }}
+            className="lg:hidden overflow-hidden bg-card border-t border-border shadow-lg"
           >
-            <div className="flex items-center justify-between px-1 py-2">
-              <span className="font-body text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Aparencia
-              </span>
-              {showThemeToggle ? <ThemeToggleButton compact /> : null}
-            </div>
-
-            <span className="px-3 pt-2 pb-1 font-body text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-              Navegação
-            </span>
-
-            {navLinks.map(link => (
-              <a
-                key={link.href}
-                href={isHomePage ? link.href : `/${link.href}`}
-                onClick={e => {
-                  e.preventDefault();
-                  handleNavClick(link.href);
-                }}
-                className="font-body text-[15px] font-medium text-muted-foreground hover:text-red-brand hover:bg-muted/40 px-3 py-3 rounded transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-
-            <span className="px-3 pt-2 pb-1 font-body text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-              Institucional
-            </span>
-
-            {supportLinks.map(link => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="font-body text-[15px] font-medium text-muted-foreground hover:text-red-brand hover:bg-muted/40 px-3 py-3 rounded transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-
-            {/* Mobile Login Button - Prominent */}
-            <a
-              href="/profile-selector?source=navbar-mobile"
-              className="mt-3 font-heading font-semibold text-sm px-5 py-3.5 bg-red-brand text-white rounded-lg text-center hover:bg-red-brand-dark transition-colors w-full flex items-center justify-center gap-2 shadow-md"
+            <nav
+              id="mobile-main-nav"
+              className="container max-h-[calc(100svh-4.75rem)] overflow-y-auto py-3 flex flex-col gap-1"
             >
-              <LogIn size={18} />
-              <span>Acessar Plataforma</span>
-            </a>
-
-            {/* Mobile Contact Button */}
-            {showContactButton ? (
-              <a
-                href={isHomePage ? "#contato" : "/#contato"}
-                onClick={e => {
-                  if (isHomePage) {
-                    e.preventDefault();
-                    handleNavClick("#contato");
-                  }
-                }}
-                className="mt-2 mb-1 font-heading font-semibold text-sm px-5 py-3.5 border-2 border-red-brand text-red-brand rounded-lg text-center hover:bg-red-brand hover:text-white transition-colors w-full"
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.16, ease: "easeOut", delay: 0.03 }}
+                className="flex items-center justify-between px-1 py-2"
               >
-                Entrar em contato
-              </a>
-            ) : null}
-          </nav>
-        </div>
-      )}
+                <span className="font-body text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Aparencia
+                </span>
+                {showThemeToggle ? <ThemeToggleButton compact /> : null}
+              </motion.div>
+
+              <motion.span
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.16, ease: "easeOut", delay: 0.05 }}
+                className="px-3 pt-2 pb-1 font-body text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80"
+              >
+                Navegação
+              </motion.span>
+
+              {navLinks.map((link, index) => (
+                <motion.a
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{
+                    duration: 0.16,
+                    ease: "easeOut",
+                    delay: 0.07 + index * 0.03,
+                  }}
+                  key={link.href}
+                  href={isHomePage ? link.href : `/${link.href}`}
+                  onClick={e => {
+                    e.preventDefault();
+                    handleNavClick(link.href);
+                  }}
+                  className="font-body text-[15px] font-medium text-muted-foreground hover:text-red-brand hover:bg-muted/40 px-3 py-3 rounded transition-colors"
+                >
+                  {link.label}
+                </motion.a>
+              ))}
+
+              <motion.span
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.16, ease: "easeOut", delay: 0.2 }}
+                className="px-3 pt-2 pb-1 font-body text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80"
+              >
+                Institucional
+              </motion.span>
+
+              {supportLinks.map((link, index) => (
+                <motion.a
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{
+                    duration: 0.16,
+                    ease: "easeOut",
+                    delay: 0.22 + index * 0.03,
+                  }}
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="font-body text-[15px] font-medium text-muted-foreground hover:text-red-brand hover:bg-muted/40 px-3 py-3 rounded transition-colors"
+                >
+                  {link.label}
+                </motion.a>
+              ))}
+
+              <motion.a
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.16, ease: "easeOut", delay: 0.3 }}
+                href="/profile-selector?source=navbar-mobile"
+                className="mt-3 font-heading font-semibold text-sm px-5 py-3.5 bg-red-brand text-white rounded-lg text-center hover:bg-red-brand-dark transition-colors w-full flex items-center justify-center gap-2 shadow-md"
+              >
+                <LogIn size={18} />
+                <span>Acessar Plataforma</span>
+              </motion.a>
+
+              {showContactButton ? (
+                <motion.a
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.16, ease: "easeOut", delay: 0.33 }}
+                  href={isHomePage ? "#contato" : "/#contato"}
+                  onClick={e => {
+                    if (isHomePage) {
+                      e.preventDefault();
+                      handleNavClick("#contato");
+                    }
+                  }}
+                  className="mt-2 mb-1 font-heading font-semibold text-sm px-5 py-3.5 border-2 border-red-brand text-red-brand rounded-lg text-center hover:bg-red-brand hover:text-white transition-colors w-full"
+                >
+                  Entrar em contato
+                </motion.a>
+              ) : null}
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

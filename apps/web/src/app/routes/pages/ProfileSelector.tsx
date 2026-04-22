@@ -31,8 +31,18 @@ export default function ProfileSelector() {
     <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <FloatingThemeToggle />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(139,17,32,0.18),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.16),_transparent_28%),linear-gradient(135deg,_var(--background),_var(--muted))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(139,17,32,0.38),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.2),_transparent_28%),linear-gradient(135deg,_var(--background),_var(--muted))]" />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.075] mix-blend-soft-light"
+        style={{
+          backgroundImage:
+            "linear-gradient(45deg, rgba(255,255,255,0.7) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,0.7) 25%, transparent 25%), radial-gradient(circle at 1px 1px, rgba(255,255,255,0.65) 1px, transparent 0)",
+          backgroundSize: "22px 22px, 22px 22px, 18px 18px",
+          backgroundPosition: "0 0, 0 0, 0 0",
+        }}
+      />
       <div className="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-red-brand/10 to-transparent" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.06),transparent_23%),radial-gradient(circle_at_80%_76%,rgba(255,255,255,0.05),transparent_28%)] dark:bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.04),transparent_23%),radial-gradient(circle_at_80%_76%,rgba(255,255,255,0.03),transparent_28%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_72%,rgba(139,17,32,0.03)_100%)]" />
 
       <main className="relative z-10">
         <section className="container mx-auto flex min-h-screen flex-col items-center justify-center gap-8 py-8 lg:py-10">
@@ -100,4 +110,3 @@ export default function ProfileSelector() {
     </div>
   );
 }
-

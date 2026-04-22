@@ -1,5 +1,6 @@
 import BrandTitleLogo from "@/components/BrandTitleLogo";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/core/hooks/useAuth";
 import {
   getProfileConfig,
@@ -7,6 +8,7 @@ import {
   type UserProfile,
 } from "@/lib/profiles";
 import { trpc } from "@/lib/trpc";
+import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
@@ -14,6 +16,7 @@ import {
   BookOpenCheck,
   CalendarClock,
   CheckCircle2,
+  ChevronsUpDown,
   ClipboardList,
   FileText,
   GraduationCap,
@@ -482,9 +485,15 @@ export default function Dashboard() {
 
   const [activeProfile, setActiveProfile] =
     useState<UserProfile>(enforcedProfile);
-  const [activeSection, setActiveSection] = useState<string>(() =>
+  const [activeSection, setActiveSection] = useState<string | null>(() =>
     getFirstSectionId(enforcedProfile)
   );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.localStorage.getItem("dashboard-sidebar-collapsed") === "true"
+    );
+  });
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -503,10 +512,18 @@ export default function Dashboard() {
       const availableSections = PROFILE_SECTIONS[activeProfile].map(
         section => section.id
       );
+      if (current === null) return null;
       if (availableSections.includes(current)) return current;
-      return availableSections[0] ?? "overview";
+      return availableSections[0] ?? null;
     });
   }, [activeProfile]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "dashboard-sidebar-collapsed",
+      isSidebarCollapsed ? "true" : "false"
+    );
+  }, [isSidebarCollapsed]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -534,9 +551,10 @@ export default function Dashboard() {
 
   const profileConfig = getProfileConfig(activeProfile);
   const profileSections = PROFILE_SECTIONS[activeProfile];
-  const currentSection =
-    profileSections.find(section => section.id === activeSection) ??
-    profileSections[0];
+  const currentSection = activeSection
+    ? (profileSections.find(section => section.id === activeSection) ?? null)
+    : null;
+  const isWorkspaceHidden = activeSection === null;
 
   const userFirstName = (user?.name ?? "Usuário").split(" ")[0] ?? "Usuário";
 
@@ -554,12 +572,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-muted/40 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-red-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-body text-muted-foreground">
-            Carregando dashboard...
-          </p>
+      <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 py-8">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+          <Spinner className="size-4" aria-label="Carregando dashboard" />
+          Carregando dashboard...
         </div>
       </div>
     );
@@ -571,19 +587,22 @@ export default function Dashboard() {
 
   if (isResolvingProfile) {
     return (
-      <div className="min-h-screen bg-muted/40 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-red-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-body text-muted-foreground">
-            Validando perfil de acesso...
-          </p>
+      <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 py-8">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+          <Spinner className="size-4" aria-label="Validando perfil" />
+          Validando perfil...
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground">
+    <div className="relative min-h-screen overflow-hidden bg-muted/30 text-foreground">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,17,32,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(31,58,95,0.09),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.14),transparent_24%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(139,17,32,0.14),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(31,58,95,0.12),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_24%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(139,17,32,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(31,58,95,0.03)_1px,transparent_1px)] bg-[size:72px_72px] opacity-70" />
+      <p className="pointer-events-none absolute left-1/2 top-24 hidden -translate-x-1/2 select-none font-condensed text-[clamp(4rem,12vw,9rem)] font-bold tracking-[0.32em] text-foreground/4 md:block">
+        RED
+      </p>
       <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
         <div className="flex h-16 items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-4 min-w-0">
@@ -593,7 +612,8 @@ export default function Dashboard() {
                 Dashboard unificado RED
               </p>
               <p className="truncate font-body text-xs text-muted-foreground">
-                {profileConfig.title} • {currentSection?.title ?? "Visao geral"}
+                {profileConfig.title} •{" "}
+                {currentSection?.title ?? "Nenhuma seção selecionada"}
               </p>
             </div>
           </div>
@@ -624,60 +644,125 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="flex min-h-[calc(100vh-4rem)]">
-        <aside className="hidden w-72 shrink-0 border-r border-border bg-card/80 md:flex md:flex-col">
+      <div className="relative flex min-h-[calc(100vh-4rem)]">
+        <aside
+          className={`hidden shrink-0 border-r border-border bg-card/80 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:flex md:flex-col ${
+            isSidebarCollapsed ? "w-24" : "w-72"
+          }`}
+        >
           <div className="border-b border-border p-4">
-            <p className="mb-3 font-body text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Perfil ativo
+            <p className="mb-3 font-body text-xs uppercase tracking-[0.18em] text-muted-foreground transition-opacity">
+              {isSidebarCollapsed ? "Perfil" : "Perfil ativo"}
             </p>
-            <div className="rounded-lg border border-red-brand bg-red-brand px-3 py-3 text-white">
-              <span className="block font-heading text-sm font-semibold">
-                {profileConfig.title}
-              </span>
-              <span className="mt-1 block font-body text-xs text-white/90">
-                Acesso bloqueado para o perfil autorizado.
-              </span>
+            <div
+              className={`overflow-hidden rounded-lg border border-red-brand bg-red-brand px-3 py-3 text-white shadow-lg shadow-red-brand/10 transition-all duration-300 ${
+                isSidebarCollapsed
+                  ? "flex items-center justify-center py-4"
+                  : ""
+              }`}
+            >
+              {isSidebarCollapsed ? (
+                <profileConfig.icon size={20} className="shrink-0 text-white" />
+              ) : (
+                <>
+                  <span className="block font-heading text-sm font-semibold truncate">
+                    {profileConfig.title}
+                  </span>
+                  <span className="mt-1 block font-body text-xs text-white/90 truncate">
+                    Acesso bloqueado
+                  </span>
+                </>
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(prev => !prev)}
+              className={`mt-3 inline-flex w-full items-center justify-center rounded-lg border border-border bg-background/80 py-2.5 text-xs font-heading font-semibold text-foreground shadow-sm transition-all hover:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-red-brand/50 ${
+                isSidebarCollapsed ? "px-0" : "gap-2 px-3"
+              }`}
+              title={isSidebarCollapsed ? "Expandir menu" : "Compactar menu"}
+              aria-label={
+                isSidebarCollapsed ? "Expandir menu" : "Compactar menu"
+              }
+            >
+              <motion.div
+                animate={{ rotate: isSidebarCollapsed ? 180 : 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+              >
+                <ChevronsUpDown
+                  size={14}
+                  className="rotate-90 text-muted-foreground"
+                />
+              </motion.div>
+              {!isSidebarCollapsed && (
+                <span className="truncate">
+                  {isSidebarCollapsed ? "Expandir" : "Compactar"}
+                </span>
+              )}
+            </button>
           </div>
 
-          <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          <nav className="flex-1 space-y-1.5 overflow-y-auto p-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border hover:scrollbar-thumb-muted-foreground/40">
             {profileSections.map(section => {
               const active = activeSection === section.id;
 
               return (
-                <button
+                <motion.button
                   key={section.id}
                   type="button"
-                  onClick={() => setActiveSection(section.id)}
-                  className={`flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                  onClick={() =>
+                    setActiveSection(current =>
+                      current === section.id ? null : section.id
+                    )
+                  }
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`flex w-full items-center gap-3 overflow-hidden rounded-xl border text-left transition-all duration-200 ${
+                    isSidebarCollapsed ? "justify-center p-3" : "px-3 py-3.5"
+                  } ${
                     active
-                      ? "border-red-brand bg-red-brand text-white"
-                      : "border-transparent hover:border-border hover:bg-muted/30"
+                      ? "border-red-brand bg-red-brand text-white shadow-md shadow-red-brand/10"
+                      : "border-transparent text-foreground hover:bg-muted/80"
                   }`}
+                  title={
+                    active
+                      ? "Clique para desmarcar e esconder o conteúdo"
+                      : section.title
+                  }
                 >
-                  <section.icon size={18} className="mt-0.5 shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block font-heading text-sm font-semibold">
-                      {section.title}
-                    </span>
-                    <span
-                      className={`mt-0.5 block text-xs ${
-                        active ? "text-white/85" : "text-muted-foreground"
-                      }`}
-                    >
-                      {section.description}
-                    </span>
-                  </span>
-                </button>
+                  <motion.div
+                    animate={{ scale: active ? 1.08 : 1 }}
+                    transition={{ duration: 0.15, ease: "backOut" }}
+                    className="shrink-0 flex items-center justify-center h-5 w-5"
+                  >
+                    <section.icon size={isSidebarCollapsed ? 20 : 18} />
+                  </motion.div>
+                  {!isSidebarCollapsed && (
+                    <motion.div layout="position" className="min-w-0">
+                      <span className="block truncate font-heading text-sm font-semibold">
+                        {section.title}
+                      </span>
+                      <span
+                        className={`mt-0.5 block truncate font-body text-xs ${
+                          active ? "text-white/85" : "text-muted-foreground"
+                        }`}
+                      >
+                        {section.description}
+                      </span>
+                    </motion.div>
+                  )}
+                </motion.button>
               );
             })}
           </nav>
 
-          <div className="border-t border-border p-4">
-            <p className="font-body text-xs text-muted-foreground">
-              {profileConfig.description}
-            </p>
-          </div>
+          {!isSidebarCollapsed && (
+            <div className="border-t border-border p-4">
+              <p className="font-body text-xs leading-relaxed text-muted-foreground transition-opacity">
+                {profileConfig.description}
+              </p>
+            </div>
+          )}
         </aside>
 
         <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
@@ -685,46 +770,78 @@ export default function Dashboard() {
             <div className="rounded-lg border border-red-brand bg-red-brand px-3 py-2 text-sm font-heading font-semibold text-white">
               Perfil autorizado: {profileConfig.title}
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {profileSections.map(section => {
-                const active = activeSection === section.id;
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => setActiveSection(section.id)}
-                    className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-body ${
-                      active
-                        ? "border-red-brand bg-red-brand text-white"
-                        : "border-border bg-card text-muted-foreground"
-                    }`}
-                  >
-                    {section.title}
-                  </button>
-                );
-              })}
+            <div className="flex flex-col gap-2">
+              <p className="font-heading text-sm font-semibold text-foreground">
+                Menu
+              </p>
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
+                {profileSections.map(section => {
+                  const active = activeSection === section.id;
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() =>
+                        setActiveSection(current =>
+                          current === section.id ? null : section.id
+                        )
+                      }
+                      className={`flex w-auto items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-heading font-semibold transition-colors ${
+                        active
+                          ? "border-red-brand bg-red-brand text-white shadow-sm"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted/50"
+                      }`}
+                      title={
+                        active
+                          ? "Clique para desmarcar e ocultar o conteúdo"
+                          : section.title
+                      }
+                    >
+                      <section.icon
+                        size={14}
+                        className={
+                          active ? "text-white" : "text-muted-foreground"
+                        }
+                      />
+                      {section.title}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <p className="font-body text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {profileConfig.title}
-            </p>
-            <h1 className="mt-1 font-display text-3xl font-bold text-foreground">
-              Ola, {userFirstName}.
-            </h1>
-            <p className="mt-2 max-w-3xl font-body text-sm text-muted-foreground">
-              Estrutura unica de trabalho: header padrao, menu lateral por
-              perfil e conteudo dinâmico por secao para uma rotina escolar
-              organizada.
-            </p>
-          </div>
+          <AnimatePresence mode="wait" initial={false}>
+            {currentSection ? (
+              <motion.div
+                key={`workspace-${currentSection.id}`}
+                initial={{ opacity: 0, y: 12, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
+                <div className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
+                  <p className="font-body text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    {profileConfig.title}
+                  </p>
+                  <h1 className="mt-1 font-display text-3xl font-bold text-foreground">
+                    Ola, {userFirstName}.
+                  </h1>
+                  <p className="mt-2 max-w-3xl font-body text-sm text-muted-foreground">
+                    Estrutura unica de trabalho: header padrao, menu lateral por
+                    perfil e conteudo dinâmico por secao para uma rotina escolar
+                    organizada.
+                  </p>
+                </div>
 
-          <ProfileWorkspace
-            profile={activeProfile}
-            sectionId={currentSection?.id ?? getFirstSectionId(activeProfile)}
-            userId={user?.id ?? 0}
-          />
+                <ProfileWorkspace
+                  profile={activeProfile}
+                  sectionId={currentSection.id}
+                  userId={user?.id ?? 0}
+                />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </main>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { Skeleton } from './ui/skeleton';
+import { Skeleton } from "./ui/skeleton";
 
 export function DashboardLayoutSkeleton() {
   return (
@@ -44,4 +44,3 @@ export function DashboardLayoutSkeleton() {
     </div>
   );
 }
-
