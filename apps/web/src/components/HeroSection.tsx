@@ -8,8 +8,7 @@ import { CheckCircle2, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const accessSource = "hero";
-const HERO_IMAGE =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-hero-bg-GcCe4zBbNkWen9uhqXJpPm.webp";
+const HERO_IMAGE = "/hero-school.webp";
 
 export default function HeroSection() {
   const [visible, setVisible] = useState(false);

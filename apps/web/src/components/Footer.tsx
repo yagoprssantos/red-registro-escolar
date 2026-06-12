@@ -3,6 +3,8 @@
  * Design: Fundo azul escuro, logo branco, presença institucional compacta
  */
 
+import BrandTitleLogo from "@/components/BrandTitleLogo";
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -11,21 +13,7 @@ export default function Footer() {
       <div className="container py-10 sm:py-12 lg:py-14">
         <div className="grid grid-cols-1 gap-8 sm:gap-6 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] lg:gap-8 items-start">
           <div className="space-y-4 max-w-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 bg-red-brand rounded-sm shadow-sm">
-                <span className="font-condensed font-bold text-white text-lg tracking-wider">
-                  R
-                </span>
-              </div>
-              <div className="flex flex-col leading-none">
-                <span className="font-condensed font-bold text-foreground text-xl tracking-widest uppercase">
-                  RED
-                </span>
-                <span className="font-body text-[10px] text-muted-foreground tracking-wider uppercase">
-                  Registro Escolar Digital
-                </span>
-              </div>
-            </div>
+            <BrandTitleLogo size="compact" />
 
             <p className="font-body text-sm text-muted-foreground leading-relaxed max-w-xs">
               Plataforma digital para centralizar registros escolares e
