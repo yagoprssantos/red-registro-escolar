@@ -44,4 +44,3 @@ export function setPageMeta({
   ensureMeta('meta[name="theme-color"]', "name", "theme-color", themeColor);
   ensureMeta('meta[property="og:title"]', "property", "og:title", title);
 }
-

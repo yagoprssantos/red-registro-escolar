@@ -76,9 +76,9 @@
 
 /// <reference types="@types/google.maps" />
 
-import { useEffect, useRef } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { cn } from "@/lib/utils";
+import { useEffect, useRef } from "react";
 
 declare global {
   interface Window {
@@ -153,4 +153,3 @@ export function MapView({
     <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
   );
 }
-

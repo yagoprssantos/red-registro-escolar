@@ -79,4 +79,3 @@ export function useAuth(options?: UseAuthOptions) {
     logout,
   };
 }
-

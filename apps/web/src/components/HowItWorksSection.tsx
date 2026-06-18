@@ -5,9 +5,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const DASHBOARD_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-dashboard-preview-4yMPsYzoxBo8NTjeaZHgvA.webp";
-const FAMILY_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-family-communication-SdsbspZyQ9H9YRdBMawYq9.webp";
-const STUDENTS_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-students-learning-Q8BXmbZ3uuKhjYeGkDHznA.webp";
+const DASHBOARD_IMAGE =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-dashboard-preview-4yMPsYzoxBo8NTjeaZHgvA.webp";
+const FAMILY_IMAGE =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-family-communication-SdsbspZyQ9H9YRdBMawYq9.webp";
+const STUDENTS_IMAGE =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-students-learning-Q8BXmbZ3uuKhjYeGkDHznA.webp";
 
 const steps = [
   {
@@ -86,7 +89,11 @@ function StepItem({ step, index }: { step: (typeof steps)[0]; index: number }) {
       }`}
     >
       {/* Text side */}
-      <div className={step.imageRight ? "order-1 lg:order-1" : "order-1 lg:order-2"}>
+      <div
+        className={
+          step.imageRight ? "order-1 lg:order-1" : "order-1 lg:order-2"
+        }
+      >
         <div className="flex items-start gap-5">
           <span className="font-condensed font-bold text-7xl lg:text-8xl text-red-brand/15 leading-none select-none flex-shrink-0">
             {step.number}
@@ -102,12 +109,14 @@ function StepItem({ step, index }: { step: (typeof steps)[0]; index: number }) {
               {step.description}
             </p>
             <ul className="flex flex-col gap-2.5">
-              {step.points.map((point) => (
+              {step.points.map(point => (
                 <li key={point} className="flex items-center gap-3">
                   <span className="w-5 h-5 rounded-full bg-red-brand/10 flex items-center justify-center flex-shrink-0">
                     <span className="w-2 h-2 rounded-full bg-red-brand" />
                   </span>
-                  <span className="font-body text-sm text-muted-foreground">{point}</span>
+                  <span className="font-body text-sm text-muted-foreground">
+                    {point}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -116,7 +125,11 @@ function StepItem({ step, index }: { step: (typeof steps)[0]; index: number }) {
       </div>
 
       {/* Image side */}
-      <div className={step.imageRight ? "order-2 lg:order-2" : "order-2 lg:order-1"}>
+      <div
+        className={
+          step.imageRight ? "order-2 lg:order-2" : "order-2 lg:order-1"
+        }
+      >
         <div className="relative">
           <div className="absolute -inset-3 bg-red-brand/5 rounded-sm -z-10" />
           <img
@@ -126,7 +139,9 @@ function StepItem({ step, index }: { step: (typeof steps)[0]; index: number }) {
           />
           {/* Step number badge */}
           <div className="absolute -top-4 -right-4 w-12 h-12 bg-red-brand rounded-full flex items-center justify-center shadow-lg">
-            <span className="font-condensed font-bold text-white text-sm">{step.number}</span>
+            <span className="font-condensed font-bold text-white text-sm">
+              {step.number}
+            </span>
           </div>
         </div>
       </div>
@@ -159,7 +174,9 @@ export default function HowItWorksSection() {
         <div
           ref={titleRef}
           className={`max-w-2xl mb-20 transition-all duration-700 ${
-            titleVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            titleVisible
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-6"
           }`}
         >
           <div className="section-divider" />
@@ -171,8 +188,8 @@ export default function HowItWorksSection() {
             <span className="italic text-red-brand">decisão pedagógica</span>
           </h2>
           <p className="font-body text-base text-muted-foreground leading-relaxed">
-            Em três etapas simples, sua escola passa a operar com mais eficiência, 
-            transparência e conexão com as famílias.
+            Em três etapas simples, sua escola passa a operar com mais
+            eficiência, transparência e conexão com as famílias.
           </p>
         </div>
 
@@ -186,4 +203,3 @@ export default function HowItWorksSection() {
     </section>
   );
 }
-

@@ -4,27 +4,32 @@
  * Fundo off-white com destaque visual da imagem
  */
 
+import { Activity, Layers, PieChart, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { TrendingUp, PieChart, Activity, Layers } from "lucide-react";
 
-const DASHBOARD_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-dashboard-preview-4yMPsYzoxBo8NTjeaZHgvA.webp";
-const DATA_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-academic-data-UVsZbwGibQ3uM7jorqFyEW.webp";
+const DASHBOARD_IMAGE =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-dashboard-preview-4yMPsYzoxBo8NTjeaZHgvA.webp";
+const DATA_IMAGE =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663558029309/MctBPaw7y9F2bAkQ8CzRS9/red-academic-data-UVsZbwGibQ3uM7jorqFyEW.webp";
 
 const dataPoints = [
   {
     icon: TrendingUp,
     title: "Desempenho Acadêmico",
-    description: "Evolução de notas por aluno, turma e disciplina ao longo do tempo.",
+    description:
+      "Evolução de notas por aluno, turma e disciplina ao longo do tempo.",
   },
   {
     icon: Activity,
     title: "Frequência e Presença",
-    description: "Monitoramento de faltas com alertas automáticos para responsáveis.",
+    description:
+      "Monitoramento de faltas com alertas automáticos para responsáveis.",
   },
   {
     icon: PieChart,
     title: "Indicadores de Turma",
-    description: "Comparativos entre turmas e identificação de alunos em risco.",
+    description:
+      "Comparativos entre turmas e identificação de alunos em risco.",
   },
   {
     icon: Layers,
@@ -70,9 +75,10 @@ export default function DataSection() {
               <span className="italic text-red-brand">baseadas em dados</span>
             </h2>
             <p className="font-body text-base text-muted-foreground leading-relaxed mb-8">
-              O RED transforma dados brutos em insights acionáveis. Dashboards intuitivos permitem 
-              que gestores e professores identifiquem padrões, antecipem problemas e tomem decisões 
-              pedagógicas com mais confiança e precisão.
+              O RED transforma dados brutos em insights acionáveis. Dashboards
+              intuitivos permitem que gestores e professores identifiquem
+              padrões, antecipem problemas e tomem decisões pedagógicas com mais
+              confiança e precisão.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -82,7 +88,9 @@ export default function DataSection() {
                   <div
                     key={point.title}
                     className={`transition-all duration-500 ${
-                      visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                      visible
+                        ? "opacity-100 translate-y-0"
+                        : "opacity-0 translate-y-4"
                     }`}
                     style={{ transitionDelay: `${0.2 + index * 0.1}s` }}
                   >
@@ -138,4 +146,3 @@ export default function DataSection() {
     </section>
   );
 }
-

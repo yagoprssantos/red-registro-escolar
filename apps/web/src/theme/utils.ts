@@ -34,4 +34,3 @@ export const applyThemeToDocument = (theme: Theme) => {
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
 };
-
