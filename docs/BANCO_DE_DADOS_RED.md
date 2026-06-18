@@ -27,6 +27,12 @@ Objetivos tecnicos do banco:
 - facilitar consultas para dashboards de perfil
 - evitar arquivos pesados no banco (uso de URL em attachments)
 - suportar evolucao futura com baixo retrabalho
+- oferecer rastreabilidade de acoes relevantes (auditLogs)
+- permitir justificativa de faltas com trilha de aprovacao (absenceJustifications)
+- suportar plataformas externas por escola (schoolPlatforms)
+- definir grade horaria configuravel (scheduleSlots)
+- controle de visitas e leitura de comunicados (communicationRecipients com readAt)
+- soft delete em registros criticos (deletedAt em varias tabelas)
 
 ## 3) Mapa geral por dominio
 
@@ -37,7 +43,11 @@ Dominios principais:
 - Perfis escolares: teachers, students, guardians, studentGuardians
 - Academico: subjects, classes, classSubjects, classTeachers, classEnrollments
 - Diario escolar: classSessions, attendanceRecords, assessments, assessmentScores
+- Justificativa de faltas: absenceJustifications
 - Pedagogico e comunicacao: studentComments, schoolEvents, eventTargets, communications, communicationRecipients, notifications, attachments
+- Plataformas externas: schoolPlatforms
+- Grade horaria: scheduleSlots
+- Auditoria: auditLogs
 - Comercial/contato: contacts
 
 ## 4) Glossario rapido para leigos
@@ -50,6 +60,7 @@ Termos essenciais:
 - Unique: regra para impedir duplicidade
 - Cascade: se apagar o pai, apaga os filhos relacionados
 - Set null: se apagar o pai, o campo relacionado vira vazio
+- Soft delete: campo deletedAt marca como removido sem apagar a linha fisica
 
 ## 5) Dicionario completo: tabela por tabela
 
@@ -64,13 +75,17 @@ Atributos:
 - id: inteiro, PK, auto incremento. Identificador interno do usuario.
 - openId: texto curto, unico, obrigatorio. Identidade externa de autenticacao.
 - name: texto, opcional. Nome exibivel.
-- email: texto curto, opcional. Contato e login auxiliar.
+- email: texto curto, opcional, com index. Contato e login auxiliar.
 - loginMethod: texto curto, opcional. Metodo de autenticacao usado.
-- role: enum obrigatorio. Papel global do usuario na plataforma.
-- defaultProfile: enum opcional. Perfil padrao para abertura da experiencia.
+- role: enum obrigatorio (user, admin, teacher, student, guardian, school_staff). Papel global do usuario na plataforma.
+- defaultProfile: enum opcional (school, teacher, student, guardian). Perfil padrao para abertura da experiencia.
 - createdAt: data/hora obrigatorio. Momento de criacao.
 - updatedAt: data/hora obrigatorio. Momento da ultima atualizacao.
 - lastSignedIn: data/hora obrigatorio. Ultimo acesso.
+
+Indices:
+
+- users_email_idx sobre email
 
 Por que foi criada:
 
@@ -85,7 +100,7 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- name: texto, obrigatorio. Nome da escola.
+- name: texto curto, obrigatorio. Nome da escola.
 - email: texto curto, obrigatorio, unico. Email institucional unico.
 - phone: texto curto, opcional. Telefone.
 - address: texto, opcional. Endereco completo.
@@ -93,7 +108,7 @@ Atributos:
 - state: texto curto, opcional. Estado/UF.
 - zipCode: texto curto, opcional. CEP.
 - studentCount: inteiro, opcional. Total estimado de alunos.
-- status: enum obrigatorio. Estado da escola (ativo/inativo/trial).
+- status: enum obrigatorio (ativo, inativo, trial). Estado da escola.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
@@ -110,13 +125,19 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- schoolId: inteiro, FK para schools, obrigatorio.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
 - name: texto curto, obrigatorio. Exemplo: 2026.
 - startDate: data obrigatorio.
 - endDate: data obrigatorio.
 - isCurrent: inteiro obrigatorio (0 ou 1). Marca ano atual.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: schoolId + name
+- schoolId
+- schoolId + isCurrent
 
 Por que foi criada:
 
@@ -131,10 +152,16 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- userId: inteiro, FK para users, obrigatorio.
-- schoolId: inteiro, FK para schools, obrigatorio.
-- role: enum obrigatorio. Papel do usuario naquela escola.
+- userId: inteiro, FK para users, obrigatorio, cascade.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
+- role: enum obrigatorio (admin, director, coordinator, teacher, guardian, student). Papel do usuario naquela escola.
 - createdAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: userId + schoolId
+- userId
+- schoolId
 
 Por que foi criada:
 
@@ -149,12 +176,17 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- userId: inteiro, FK para users, obrigatorio.
-- schoolId: inteiro, FK para schools, obrigatorio.
-- role: enum obrigatorio (admin/director/coordinator/secretary).
+- userId: inteiro, FK para users, obrigatorio, cascade.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
+- role: enum obrigatorio (admin, director, coordinator, secretary).
 - positionTitle: texto curto, opcional. Cargo legivel.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: userId + schoolId + role
+- schoolId
 
 Por que foi criada:
 
@@ -169,19 +201,26 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- userId: inteiro, FK para users, obrigatorio.
-- schoolId: inteiro, FK para schools, obrigatorio.
+- userId: inteiro, FK para users, obrigatorio, cascade.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
 - name: texto curto, obrigatorio.
 - email: texto curto, obrigatorio.
 - phone: texto curto, opcional.
 - subject: texto curto, opcional. Area principal.
 - active: inteiro obrigatorio (0 ou 1). Ativo/inativo.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- Unique: userId + schoolId
+- schoolId
+- email
+
 Por que foi criada:
 
-- manter dados profissionais e ligacoes academicas de docencia.
+- manter dados profissionais e ligacoes academicas de docencia com suporte a remocao logica.
 
 ### 5.7 students
 
@@ -192,17 +231,25 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- userId: inteiro, FK opcional para users. Permite aluno sem login.
-- schoolId: inteiro, FK para schools, obrigatorio.
+- userId: inteiro, FK opcional para users, set null. Permite aluno sem login.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
 - enrollmentNumber: texto curto, opcional. Matricula interna.
 - name: texto curto, obrigatorio.
 - email: texto curto, opcional.
 - phone: texto curto, opcional.
 - dateOfBirth: data, opcional.
 - grade: texto curto, opcional. Serie/ano.
-- status: enum obrigatorio. Situacao academica.
+- status: enum obrigatorio (ativo, inativo, transferido). Situacao academica.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: userId + schoolId
+- Unique: schoolId + enrollmentNumber
+- schoolId
+- status
 
 Por que foi criada:
 
@@ -217,18 +264,25 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- userId: inteiro, FK opcional para users.
-- schoolId: inteiro, FK para schools, obrigatorio.
+- userId: inteiro, FK opcional para users, set null.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
 - name: texto curto, obrigatorio.
 - email: texto curto, obrigatorio.
 - phone: texto curto, opcional.
 - relationship: texto curto, opcional. Exemplo: mae/pai/tutor.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- Unique: userId + schoolId
+- schoolId
+- email
+
 Por que foi criada:
 
-- suportar comunicacao e acompanhamento de alunos por familia.
+- suportar comunicacao e acompanhamento de alunos por familia com suporte a remocao logica.
 
 ### 5.9 studentGuardians
 
@@ -239,11 +293,17 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- studentId: inteiro, FK para students, obrigatorio.
-- guardianId: inteiro, FK para guardians, obrigatorio.
+- studentId: inteiro, FK para students, obrigatorio, cascade.
+- guardianId: inteiro, FK para guardians, obrigatorio, cascade.
 - relationship: texto curto, opcional.
 - isPrimary: inteiro obrigatorio (0 ou 1). Responsavel principal.
 - createdAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: studentId + guardianId
+- studentId
+- guardianId
 
 Por que foi criada:
 
@@ -258,16 +318,20 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- schoolId: inteiro, FK opcional para schools.
+- schoolId: inteiro, FK opcional para schools, set null.
 - name: texto curto, obrigatorio.
 - email: texto curto, obrigatorio.
 - school: texto curto, obrigatorio. Nome informado no contato.
 - role: texto curto, obrigatorio. Papel de quem contatou.
 - students: texto curto, opcional. Faixa de alunos.
 - message: texto, opcional.
-- status: enum obrigatorio. Estado de tratamento.
+- status: enum obrigatorio (novo, respondido, descartado). Estado de tratamento.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
+
+Indices:
+
+- schoolId
 
 Por que foi criada:
 
@@ -282,12 +346,18 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- schoolId: inteiro, FK para schools, obrigatorio.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
 - name: texto curto, obrigatorio.
 - code: texto curto, opcional. Codigo da disciplina.
 - description: texto, opcional.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: schoolId + name
+- Unique: schoolId + code
+- schoolId
 
 Por que foi criada:
 
@@ -302,18 +372,26 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- schoolId: inteiro, FK para schools, obrigatorio.
-- schoolYearId: inteiro, FK para schoolYears, obrigatorio.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
+- schoolYearId: inteiro, FK para schoolYears, obrigatorio, cascade.
 - name: texto curto, obrigatorio. Exemplo: 6A.
 - gradeLabel: texto curto, obrigatorio. Exemplo: 6o Ano A.
-- shift: enum obrigatorio. Turno.
-- status: enum obrigatorio. Situacao da turma.
+- course: texto curto, opcional. Nome do curso/trilha.
+- shift: enum obrigatorio (morning, afternoon, evening, full_day). Turno.
+- status: enum obrigatorio (ativo, inativo, encerrada). Situacao da turma.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- Unique: schoolYearId + name
+- schoolId
+- schoolYearId
+
 Por que foi criada:
 
-- dar unidade academica para alocar alunos e disciplinas.
+- dar unidade academica para alocar alunos e disciplinas, com campo de curso para especializacao e suporte a remocao logica.
 
 ### 5.13 classSubjects
 
@@ -324,9 +402,15 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- classId: inteiro, FK para classes, obrigatorio.
-- subjectId: inteiro, FK para subjects, obrigatorio.
+- classId: inteiro, FK para classes, obrigatorio, cascade.
+- subjectId: inteiro, FK para subjects, obrigatorio, restrict.
 - createdAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: classId + subjectId
+- classId
+- subjectId
 
 Por que foi criada:
 
@@ -341,9 +425,14 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- classSubjectId: inteiro, FK para classSubjects, obrigatorio.
-- teacherId: inteiro, FK para teachers, obrigatorio.
+- classSubjectId: inteiro, FK para classSubjects, obrigatorio, cascade.
+- teacherId: inteiro, FK para teachers, obrigatorio, cascade.
 - createdAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: classSubjectId + teacherId
+- teacherId
 
 Por que foi criada:
 
@@ -358,16 +447,22 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- classId: inteiro, FK para classes, obrigatorio.
-- studentId: inteiro, FK para students, obrigatorio.
+- classId: inteiro, FK para classes, obrigatorio, cascade.
+- studentId: inteiro, FK para students, obrigatorio, cascade.
 - enrollmentDate: data obrigatorio.
-- status: enum obrigatorio. Ativo/transferido/concluido.
+- status: enum obrigatorio (ativo, transferido, concluido).
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- Unique: classId + studentId
+- studentId
+
 Por que foi criada:
 
-- guardar historico de alocacao e situacao da matricula do aluno.
+- guardar historico de alocacao e situacao da matricula do aluno com suporte a remocao logica.
 
 ### 5.16 classSessions
 
@@ -378,13 +473,18 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- classSubjectId: inteiro, FK para classSubjects, obrigatorio.
-- teacherId: inteiro, FK opcional para teachers.
+- classSubjectId: inteiro, FK para classSubjects, obrigatorio, cascade.
+- teacherId: inteiro, FK opcional para teachers, set null.
 - lessonDate: data obrigatorio.
 - lessonNumber: inteiro obrigatorio. Numero da aula no dia.
 - topic: texto curto, opcional. Tema da aula.
 - notes: texto, opcional.
 - createdAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: classSubjectId + lessonDate + lessonNumber
+- lessonDate
 
 Por que foi criada:
 
@@ -399,17 +499,24 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- classSessionId: inteiro, FK para classSessions, obrigatorio.
-- studentId: inteiro, FK para students, obrigatorio.
-- status: enum obrigatorio. Presente/falta/justificada.
+- classSessionId: inteiro, FK para classSessions, obrigatorio, cascade.
+- studentId: inteiro, FK para students, obrigatorio, cascade.
+- status: enum obrigatorio (present, absent, justified).
 - reason: texto, opcional. Motivo da justificativa/falta.
-- recordedByTeacherId: inteiro, FK opcional para teachers.
+- recordedByTeacherId: inteiro, FK opcional para teachers, set null.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- Unique: classSessionId + studentId
+- studentId
+- status
+
 Por que foi criada:
 
-- controle fino de frequencia por aula, nao apenas por periodo agregado.
+- controle fino de frequencia por aula, nao apenas por periodo agregado, com suporte a remocao logica.
 
 ### 5.18 assessments
 
@@ -420,19 +527,25 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- classSubjectId: inteiro, FK para classSubjects, obrigatorio.
-- teacherId: inteiro, FK opcional para teachers.
+- classSubjectId: inteiro, FK para classSubjects, obrigatorio, cascade.
+- teacherId: inteiro, FK opcional para teachers, set null.
 - title: texto curto, obrigatorio.
 - description: texto, opcional.
 - maxScore: decimal obrigatorio. Nota maxima (padrao 10.00).
 - weight: decimal obrigatorio. Peso (padrao 1.00).
 - assessmentDate: data obrigatorio.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- classSubjectId
+- assessmentDate
+
 Por que foi criada:
 
-- separar definicao da avaliacao dos resultados por aluno.
+- separar definicao da avaliacao dos resultados por aluno, com suporte a remocao logica.
 
 ### 5.19 assessmentScores
 
@@ -443,16 +556,22 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- assessmentId: inteiro, FK para assessments, obrigatorio.
-- studentId: inteiro, FK para students, obrigatorio.
+- assessmentId: inteiro, FK para assessments, obrigatorio, cascade.
+- studentId: inteiro, FK para students, obrigatorio, cascade.
 - score: decimal obrigatorio.
 - feedback: texto, opcional.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- Unique: assessmentId + studentId
+- studentId
+
 Por que foi criada:
 
-- armazenar resultados individuais e possibilitar medias e historicos.
+- armazenar resultados individuais e possibilitar medias e historicos, com suporte a remocao logica.
 
 ### 5.20 studentComments
 
@@ -463,19 +582,27 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- schoolId: inteiro, FK para schools, obrigatorio.
-- studentId: inteiro, FK para students, obrigatorio.
-- teacherId: inteiro, FK opcional para teachers.
-- classSubjectId: inteiro, FK opcional para classSubjects.
-- category: enum obrigatorio. elogio/melhoria/ocorrencia/comentario.
-- visibility: enum obrigatorio. student/guardian/school/all.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
+- studentId: inteiro, FK para students, obrigatorio, cascade.
+- teacherId: inteiro, FK opcional para teachers, set null.
+- classSubjectId: inteiro, FK opcional para classSubjects, set null.
+- category: enum obrigatorio (elogio, melhoria, ocorrencia, comentario).
+- visibility: enum obrigatorio (student, guardian, school, all).
 - content: texto obrigatorio.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- schoolId
+- studentId
+- category
+- createdAt
+
 Por que foi criada:
 
-- registrar observacoes de desenvolvimento e ocorrencias com regra de visibilidade.
+- registrar observacoes de desenvolvimento e ocorrencias com regra de visibilidade e suporte a remocao logica.
 
 ### 5.21 schoolEvents
 
@@ -486,19 +613,25 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- schoolId: inteiro, FK para schools, obrigatorio.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
 - title: texto curto, obrigatorio.
 - description: texto, opcional.
-- eventType: enum obrigatorio. Tipo do evento.
+- eventType: enum obrigatorio (prova, feriado, saida_antecipada, evento_escolar, reuniao).
 - startsAt: data/hora obrigatorio.
 - endsAt: data/hora opcional.
-- createdByUserId: inteiro, FK opcional para users.
+- createdByUserId: inteiro, FK opcional para users, set null.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- schoolId
+- startsAt
+
 Por que foi criada:
 
-- centralizar agenda escolar e integrar com comunicacao.
+- centralizar agenda escolar e integrar com comunicacao, com suporte a remocao logica.
 
 ### 5.22 eventTargets
 
@@ -509,10 +642,15 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- eventId: inteiro, FK para schoolEvents, obrigatorio.
-- targetType: enum obrigatorio. school/class/student/guardian.
+- eventId: inteiro, FK para schoolEvents, obrigatorio, cascade.
+- targetType: enum obrigatorio (school, class, student, guardian).
 - targetRefId: inteiro obrigatorio. Id alvo conforme tipo.
 - createdAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: eventId + targetType + targetRefId
+- targetType + targetRefId
 
 Por que foi criada:
 
@@ -527,37 +665,48 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- schoolId: inteiro, FK para schools, obrigatorio.
-- authorUserId: inteiro, FK opcional para users.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
+- authorUserId: inteiro, FK opcional para users, set null.
 - title: texto curto, obrigatorio.
 - body: texto obrigatorio.
-- communicationType: enum obrigatorio. announcement/reminder/alert.
-- relatedEventId: inteiro, FK opcional para schoolEvents.
+- communicationType: enum obrigatorio (announcement, reminder, alert).
+- relatedEventId: inteiro, FK opcional para schoolEvents, set null.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
 - updatedAt: data/hora obrigatorio.
 
+Indices:
+
+- schoolId
+- communicationType
+
 Por que foi criada:
 
-- padronizar comunicados e apoiar rastreabilidade de origem.
+- padronizar comunicados e apoiar rastreabilidade de origem, com suporte a remocao logica.
 
 ### 5.24 communicationRecipients
 
 Para que serve:
 
-- destinatarios de cada comunicado
+- destinatarios de cada comunicado com controle de leitura
 
 Atributos:
 
 - id: inteiro, PK.
-- communicationId: inteiro, FK para communications, obrigatorio.
-- recipientType: enum obrigatorio. student/guardian/teacher/staff.
+- communicationId: inteiro, FK para communications, obrigatorio, cascade.
+- recipientType: enum obrigatorio (student, guardian, teacher, staff).
 - recipientRefId: inteiro obrigatorio. Id do destinatario no contexto.
 - readAt: data/hora opcional. Momento da leitura.
 - createdAt: data/hora obrigatorio.
 
+Indices:
+
+- Unique: communicationId + recipientType + recipientRefId
+- recipientType + recipientRefId
+
 Por que foi criada:
 
-- permitir distribuicao segmentada e futuro controle de leitura.
+- permitir distribuicao segmentada e controle de leitura por destinatario.
 
 ### 5.25 notifications
 
@@ -568,18 +717,25 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- userId: inteiro, FK para users, obrigatorio.
-- notificationType: enum obrigatorio.
+- userId: inteiro, FK para users, obrigatorio, cascade.
+- notificationType: enum obrigatorio (absence_alert, grade_published, comment_received, communication, event_reminder, justification_pending, justification_result, general).
 - title: texto curto, obrigatorio.
 - body: texto obrigatorio.
 - actionUrl: texto curto longo, opcional. Link de acao.
 - isRead: inteiro obrigatorio (0 ou 1).
 - readAt: data/hora opcional.
+- deletedAt: data/hora, opcional. Soft delete.
 - createdAt: data/hora obrigatorio.
+
+Indices:
+
+- userId
+- userId + isRead
+- createdAt
 
 Por que foi criada:
 
-- desacoplar notificacao de comunicados e oferecer experiencia pessoal por usuario.
+- desacoplar notificacao de comunicados e oferecer experiencia pessoal por usuario com tipos especificos para cada contexto (falta, nota, comentario, justificativa, evento) e suporte a remocao logica.
 
 ### 5.26 attachments
 
@@ -590,7 +746,7 @@ Para que serve:
 Atributos:
 
 - id: inteiro, PK.
-- ownerType: enum obrigatorio. event/communication/comment.
+- ownerType: enum obrigatorio (event, communication, comment).
 - ownerId: inteiro obrigatorio. Id da entidade dona do anexo.
 - fileUrl: texto curto longo, obrigatorio. URL do arquivo.
 - fileName: texto curto, obrigatorio.
@@ -598,15 +754,130 @@ Atributos:
 - sizeBytes: inteiro, opcional.
 - createdAt: data/hora obrigatorio.
 
+Indices:
+
+- ownerType + ownerId
+
 Por que foi criada:
 
 - manter anexos sem salvar binario dentro do banco, reduzindo custo e complexidade.
+
+### 5.27 absenceJustifications
+
+Para que serve:
+
+- justificativa de faltas com trilha de aprovacao pela gestao escolar
+
+Atributos:
+
+- id: inteiro, PK.
+- attendanceRecordId: inteiro, FK para attendanceRecords, obrigatorio, cascade.
+- guardianId: inteiro, FK para guardians, obrigatorio, cascade.
+- reason: texto obrigatorio. Motivo da justificativa.
+- attachmentUrl: texto curto longo, opcional. URL de comprovante anexo.
+- status: enum obrigatorio (pending, approved, rejected). Estado da justificativa.
+- reviewedByUserId: inteiro, FK opcional para users, set null.
+- reviewedAt: data/hora, opcional.
+- reviewNotes: texto, opcional.
+- createdAt: data/hora obrigatorio.
+- updatedAt: data/hora obrigatorio.
+
+Indices:
+
+- attendanceRecordId
+- guardianId
+- status
+
+Por que foi criada:
+
+- permitir que responsaveis justifiquem faltas de alunos e que a gestao escolar as aprove ou rejeite, com rastreabilidade do revisor e notas de revisao.
+
+### 5.28 schoolPlatforms
+
+Para que serve:
+
+- plataformas e servicos externos vinculados a escola
+
+Atributos:
+
+- id: inteiro, PK.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
+- name: texto curto, obrigatorio. Nome da plataforma.
+- description: texto, opcional.
+- url: texto curto longo, obrigatorio. Link de acesso.
+- emoji: texto curto, opcional. Icone visual.
+- colorGradient: texto curto, opcional. Estilo de cor do card.
+- sortOrder: inteiro obrigatorio. Ordem de exibicao.
+- createdAt: data/hora obrigatorio.
+- updatedAt: data/hora obrigatorio.
+
+Indices:
+
+- schoolId
+
+Por que foi criada:
+
+- permitir que cada escola configure as plataformas externas que seus alunos e responsaveis usam (Google Classroom, SISEDU, etc.), substituindo listas estaticas no frontend.
+
+### 5.29 scheduleSlots
+
+Para que serve:
+
+- grade horaria configuravel por escola e turno
+
+Atributos:
+
+- id: inteiro, PK.
+- schoolId: inteiro, FK para schools, obrigatorio, cascade.
+- shift: texto curto, obrigatorio. Turno (morning/afternoon/evening).
+- slotNumber: inteiro obrigatorio. Numero da aula no turno.
+- startTime: texto curto, obrigatorio. Horario de inicio (HH:MM).
+- endTime: texto curto, obrigatorio. Horario de fim (HH:MM).
+- createdAt: data/hora obrigatorio.
+
+Indices:
+
+- Unique: schoolId + shift + slotNumber
+- schoolId
+
+Por que foi criada:
+
+- permitir que cada escola defina os horarios de aula por turno, substituindo listas estaticas no frontend e suportando a tela de horario do aluno.
+
+### 5.30 auditLogs
+
+Para que serve:
+
+- registro de acoes relevantes para rastreabilidade e conformidade
+
+Atributos:
+
+- id: inteiro, PK.
+- userId: inteiro, FK opcional para users, set null.
+- action: texto curto, obrigatorio. Tipo de acao (create, update, delete, restore, access).
+- entity: texto curto, obrigatorio. Nome da tabela/entidade.
+- entityId: inteiro, opcional. Id da entidade afetada.
+- changes: texto, opcional. JSON das alteracoes.
+- schoolId: inteiro, FK opcional para schools, set null.
+- ipAddress: texto curto, opcional. IP do usuario.
+- createdAt: data/hora obrigatorio.
+
+Indices:
+
+- userId
+- entity + entityId
+- schoolId
+- createdAt
+
+Por que foi criada:
+
+- registrar quem fez o que, quando e em qual entidade, atendendo requisitos de auditoria, LGPD e rastreabilidade de acoes administrativas.
 
 ## 6) Relacoes criticas de integridade
 
 Relacoes de maior impacto:
 
-- users -> userSchools, teachers, students, guardians, schoolStaffProfiles, notifications
+- users -> userSchools, teachers, students, guardians, schoolStaffProfiles, notifications, schoolEvents, communications, auditLogs
 - schools -> quase todo dominio institucional e academico
 - schoolYears -> classes
 - classes + subjects -> classSubjects
@@ -614,10 +885,14 @@ Relacoes de maior impacto:
 - classSessions -> attendanceRecords
 - assessments -> assessmentScores
 - students <-> guardians via studentGuardians
+- attendanceRecords -> absenceJustifications
+- guardians -> absenceJustifications
+- schools -> schoolPlatforms, scheduleSlots
 
 Protecoes contra duplicidade:
 
 - userSchools (userId + schoolId)
+- schoolStaffProfiles (userId + schoolId + role)
 - studentGuardians (studentId + guardianId)
 - classes (schoolYearId + name)
 - classSubjects (classId + subjectId)
@@ -625,6 +900,10 @@ Protecoes contra duplicidade:
 - classEnrollments (classId + studentId)
 - attendanceRecords (classSessionId + studentId)
 - assessmentScores (assessmentId + studentId)
+- eventTargets (eventId + targetType + targetRefId)
+- communicationRecipients (communicationId + recipientType + recipientRefId)
+- scheduleSlots (schoolId + shift + slotNumber)
+- subjects (schoolId + name e schoolId + code)
 
 ## 7) Como os requisitos foram cobertos
 
@@ -635,16 +914,27 @@ Requisitos funcionais atendidos:
 - notas por avaliacao na escala decimal (com maximo padrao 10)
 - comentarios com controle de visibilidade
 - eventos e comunicacao segmentada
-- notificacoes por usuario
+- notificacoes por usuario com tipos especificos (absence_alert, grade_published, comment_received, communication, event_reminder, justification_pending, justification_result, general)
 - anexos por URL (sem binario no banco)
+- justificativa de faltas com trilha de aprovacao (responsavel submete, gestao revisa)
+- plataformas externas por escola (substitui lista estatica)
+- grade horaria configuravel por escola e turno (substitui lista estatica)
+- auditoria de acoes criticas (create, update, delete, restore, access)
+- controle de leitura de comunicados (readAt em communicationRecipients)
+- soft delete em entidades criticas (teachers, students, guardians, classes, classEnrollments, attendanceRecords, assessments, assessmentScores, studentComments, schoolEvents, communications, notifications)
+- LGPD: exportacao de dados do aluno via school.exportStudentData
+- multi-tenant: todas as consultas filtram por schoolId e validam vinculo
 
 Evidencias de implementacao:
 
-- modelagem de tabelas: drizzle/schema.ts
+- modelagem de tabelas: drizzle/schema.ts (30 tabelas)
 - relacoes tipadas: drizzle/relations.ts
-- baseline resetado: drizzle/0000_broken_hairball.sql e drizzle/meta
+- baseline resetado: drizzle/0000_silky_hellfire_club.sql e drizzle/meta
 - camada de dados real: apps/server/src/db.ts
 - rotas de perfil sem mocks: apps/server/src/profiles.ts
+- routers de dominio: apps/server/src/domain/ (attendance, comments, communications, events, grades, justifications, school, audit)
+- registro generico CRUD: apps/server/src/registry.ts
+- seed com dados fake integrado: apps/server/src/scripts/fakeData.ts
 - onboarding integrando perfis: apps/server/src/routers.ts
 - testes estruturais e de regra: apps/server/test
 
@@ -693,8 +983,9 @@ Problema:
 Contorno:
 
 - mascarar autor para aluno (ja implementado).
-- trilha de auditoria por autor e data.
+- trilha de auditoria por autor e data (auditLogs).
 - politicas de acesso por perfil e escola.
+- exportacao LGPD via school.exportStudentData.
 
 ### 8.5 Risco operacional de ambiente
 
@@ -708,16 +999,41 @@ Contorno:
 - validar conexao no pipeline antes de migrate.
 - executar testes MySQL com flag dedicada em ambiente preparado.
 
+### 8.6 Risco de justificativas orfas
+
+Problema:
+
+- se um attendanceRecord for removido em cascade, a absenceJustification associada tambem e removida, perdendo historico.
+
+Contorno:
+
+- considerar set null em vez de cascade na FK attendanceRecordId quando a justificativa ja estiver approved.
+- ou arquivar justificativas aprovadas antes de permitir remocao do registro de presenca.
+
+### 8.7 Risco de scheduleSlots sem classSessions vinculados
+
+Problema:
+
+- scheduleSlots define horarios mas nao tem FK direta para classSessions.
+
+Contorno:
+
+- garantir no backend que o slot usado na aula corresponde ao horario configurado da escola.
+- validar consistencia ao registrar classSessions.
+
 ## 9) Adaptabilidade e flexibilidade (evolucao recomendada)
 
 Melhorias de curto e medio prazo:
 
 - trocar campos inteiros booleanos (isCurrent, isPrimary, isRead, active) por tipo boolean quando adequado ao dialeto e padrao do projeto.
 - introduzir auditoria padrao (createdBy, updatedBy) em tabelas de alto impacto pedagogico.
-- criar soft delete em entidades administrativas, quando for necessario historico sem remocao fisica.
+- criar soft delete em entidades administrativas restantes (schools, subjects, contacts, userSchools) quando for necessario historico sem remocao fisica.
 - versionar rubricas de avaliacao para historico de criterio pedagogico.
 - adicionar particionamento por ano letivo em tabelas muito volumosas, se volume crescer fortemente.
 - consolidar convenios de naming de enums para facilitar analytics e BI.
+- adicionar FK de scheduleSlots em classSessions para garantir consistencia de horario.
+- ampliar tipos de notificationType conforme surjam novas integracoes (ex.: message_received, assignment_due).
+- criar tabela de turma-horario (classSchedule) ligando classSubject a scheduleSlot para grade semanal por turma.
 
 ## 10) Estado de completude do plano
 
@@ -730,10 +1046,14 @@ Status por fase:
 - Fase 4: concluida
 - Fase 5: concluida
 - Fase 6: concluida
-- Fase 7: tecnicamente pronta no codigo, pendente apenas de validacao em banco remoto com credencial valida
+- Fase 7: concluida (migracao executada em banco remoto)
+- Fase 8: concluida (tabelas absenceJustifications, schoolPlatforms, scheduleSlots, auditLogs e aprimoramentos em notifications e soft deletes)
+- Fase 9: em andamento (orientacao para ampliar dados e endpoints no servidor)
 
 Resumo final:
 
 - A estrutura do banco foi de fato reconstruida do zero conforme o plano.
 - O desenho esta coerente para operacao escolar real e preparado para evolucao.
-- O unico ponto pendente para fechamento operacional total e executar a validacao final de migracao em um MySQL acessivel (nuvem, conforme proxima etapa).
+- 30 tabelas implementadas cobrindo identidade, institucional, academico, diario, justificativa, comunicacao, plataformas, horarios e auditoria.
+- O frontend ja consome dados dinamicamente via tRPC em todas as telas de dashboard.
+- Proximo passo: ampliar seed e procedures tRPC para enriquecer os dados disponiveis nas telas (ver ORIENTACAO_SERVER_ATUALIZACAO.md).
