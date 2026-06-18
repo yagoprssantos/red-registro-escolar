@@ -6,23 +6,29 @@ import { Toaster } from "../components/ui/sonner";
 import { Spinner } from "../components/ui/spinner";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { ThemeProvider } from "../contexts/ThemeContext";
-import Home from "./routes/pages/Home";
-import NotFound from "./routes/pages/NotFound";
+import Home from "../pages/landing/Home";
+import NotFound from "../pages/landing/NotFound";
 
-const ProfileSelector = lazy(() => import("./routes/pages/ProfileSelector"));
-const LoginPage = lazy(() => import("./routes/pages/LoginPage"));
-const Dashboard = lazy(() => import("./routes/pages/Dashboard"));
-const Onboarding = lazy(() => import("./routes/pages/Onboarding"));
-const PrivacyPolicy = lazy(() => import("./routes/pages/legal/PrivacyPolicy"));
-const TermsOfUse = lazy(() => import("./routes/pages/legal/TermsOfUse"));
+const ProfileSelector = lazy(
+  () => import("../pages/app/login/ProfileSelector")
+);
+const LoginPage = lazy(() => import("../pages/app/login/LoginPage"));
+const DashboardShell = lazy(() => import("../pages/shared/DashboardShell"));
+const Onboarding = lazy(() => import("../pages/shared/Onboarding"));
+const PrivacyPolicy = lazy(
+  () => import("../pages/landing/legal/PrivacyPolicy")
+);
+const TermsOfUse = lazy(() => import("../pages/landing/legal/TermsOfUse"));
 const LGPDCompliance = lazy(
-  () => import("./routes/pages/legal/LGPDCompliance")
+  () => import("../pages/landing/legal/LGPDCompliance")
 );
-const HelpCenter = lazy(() => import("./routes/pages/support/HelpCenter"));
+const HelpCenter = lazy(() => import("../pages/landing/support/HelpCenter"));
 const Documentation = lazy(
-  () => import("./routes/pages/support/Documentation")
+  () => import("../pages/landing/support/Documentation")
 );
-const SystemStatus = lazy(() => import("./routes/pages/support/SystemStatus"));
+const SystemStatus = lazy(
+  () => import("../pages/landing/support/SystemStatus")
+);
 
 function LoadingFallback() {
   return (
@@ -88,22 +94,27 @@ function Router() {
       </Route>
       <Route path={"/dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
-          <Dashboard />
+          <DashboardShell />
+        </Suspense>
+      </Route>
+      <Route path={"/dashboard/:section"}>
+        <Suspense fallback={<LoadingFallback />}>
+          <DashboardShell />
         </Suspense>
       </Route>
       <Route path={"/teacher-dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
-          <Dashboard />
+          <DashboardShell />
         </Suspense>
       </Route>
       <Route path={"/student-dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
-          <Dashboard />
+          <DashboardShell />
         </Suspense>
       </Route>
       <Route path={"/guardian-dashboard"}>
         <Suspense fallback={<LoadingFallback />}>
-          <Dashboard />
+          <DashboardShell />
         </Suspense>
       </Route>
       <Route path={"/onboarding"}>

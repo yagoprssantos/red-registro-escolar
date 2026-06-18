@@ -3,10 +3,10 @@
  * Wizard de múltiplos passos para preenchimento de dados pós-login
  */
 
-import { useAuth } from "@/core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
   AlertCircle,
@@ -719,4 +719,3 @@ export default function Onboarding() {
     </div>
   );
 }
-
