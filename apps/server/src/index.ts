@@ -6,7 +6,7 @@ import net from "net";
 import { createContext } from "./core/context";
 import { registerOAuthRoutes } from "./core/oauth";
 import { serveStatic, setupVite } from "./core/vite";
-import { getDb } from "./db";
+import { checkDatabaseConnection } from "./db";
 import { appRouter } from "./routers";
 
 // Check if running in API-only mode (no frontend serving)
@@ -61,13 +61,13 @@ async function startServer() {
   // Basic health endpoint for infra probes (Render health check)
   app.get("/healthz", async (_req, res) => {
     try {
-      const db = await getDb();
-      const usingMemoryStore = !process.env.DATABASE_URL;
+      const usingMemoryStore = !process.env.SUPABASE_URL;
+      const databaseConnected = usingMemoryStore ? false : await checkDatabaseConnection();
       res.status(200).json({
         ok: true,
         apiOnlyMode: API_ONLY_MODE,
         databaseConfigured: !usingMemoryStore,
-        databaseConnected: usingMemoryStore ? false : Boolean(db),
+        databaseConnected,
       });
     } catch {
       res.status(500).json({ ok: false });

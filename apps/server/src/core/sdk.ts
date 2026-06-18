@@ -2,21 +2,21 @@ import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
-import type { User } from "../../../../drizzle/schema";
+import type { User } from "../db";
 import {
-    AXIOS_TIMEOUT_MS,
-    COOKIE_NAME,
-    ONE_YEAR_MS,
+  AXIOS_TIMEOUT_MS,
+  COOKIE_NAME,
+  ONE_YEAR_MS,
 } from "../../../../packages/shared/src/const.ts";
 import { ForbiddenError } from "../../../../packages/shared/src/core/errors.ts";
 import * as db from "../db";
 import { ENV } from "./env";
 import type {
-    ExchangeTokenRequest,
-    ExchangeTokenResponse,
-    GetUserInfoResponse,
-    GetUserInfoWithJwtRequest,
-    GetUserInfoWithJwtResponse,
+  ExchangeTokenRequest,
+  ExchangeTokenResponse,
+  GetUserInfoResponse,
+  GetUserInfoWithJwtRequest,
+  GetUserInfoWithJwtResponse,
 } from "./types/oauthTypes";
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
@@ -34,7 +34,7 @@ const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserI
 
 class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {
-    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
+    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl || "(not configured — Supabase-only auth)");
   }
 
   private decodeState(state: string): string {
@@ -75,11 +75,13 @@ class OAuthService {
   }
 }
 
-const createOAuthHttpClient = (): AxiosInstance =>
-  axios.create({
-    baseURL: ENV.oAuthServerUrl,
+const createOAuthHttpClient = (): AxiosInstance => {
+  const baseURL = ENV.oAuthServerUrl || "http://localhost:0";
+  return axios.create({
+    baseURL,
     timeout: AXIOS_TIMEOUT_MS,
   });
+};
 
 class SDKServer {
   private readonly client: AxiosInstance;
@@ -291,7 +293,7 @@ class SDKServer {
     }
 
     // If user not in DB, sync from OAuth server automatically
-    if (!user) {
+    if (!user && ENV.oAuthServerUrl) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({

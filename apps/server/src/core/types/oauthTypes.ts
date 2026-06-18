@@ -65,4 +65,3 @@ export interface GetUserInfoWithJwtResponse {
   platform?: string | null;
   loginMethod?: string | null;
 }
-
