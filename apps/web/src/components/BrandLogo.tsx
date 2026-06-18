@@ -1,19 +1,19 @@
 import { useTheme } from "@/contexts/ThemeContext";
 import type { MouseEvent } from "react";
 
-type BrandTitleLogoProps = {
+type BrandLogoProps = {
   href?: string;
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   className?: string;
   size?: "compact" | "regular";
 };
 
-export default function BrandTitleLogo({
+export default function BrandLogo({
   href = "/",
   onClick,
   className = "",
   size = "regular",
-}: BrandTitleLogoProps) {
+}: BrandLogoProps) {
   const isCompact = size === "compact";
   const { theme } = useTheme();
   const logoSrc = theme === "dark" ? "/logo-white.svg" : "/logo-black.svg";
@@ -33,26 +33,6 @@ export default function BrandTitleLogo({
             : "h-[clamp(2.9rem,4vw,3.5rem)] w-auto"
         }`}
       />
-      <div className="leading-none text-left">
-        <p
-          className={`font-condensed font-bold tracking-[0.25em] text-red-brand uppercase ${
-            isCompact
-              ? "text-[clamp(1.05rem,1.5vw,1.25rem)]"
-              : "text-[clamp(1.25rem,1.8vw,1.55rem)]"
-          }`}
-        >
-          RED
-        </p>
-        <p
-          className={`font-body text-[11px] uppercase tracking-[0.24em] text-muted-foreground ${
-            isCompact
-              ? "hidden sm:block text-[clamp(0.65rem,0.75vw,0.72rem)]"
-              : "block"
-          }`}
-        >
-          Registro Escolar Digital
-        </p>
-      </div>
     </a>
   );
 }
