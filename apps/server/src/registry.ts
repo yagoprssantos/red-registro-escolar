@@ -4,6 +4,7 @@ import { protectedProcedure, router } from "./core/trpc";
 import {
   createEntityRow,
   deleteEntityRow,
+  entitySupportsSoftDelete,
   getEntityById,
   getUserManagedSchoolIds,
   listEntityRows,
@@ -12,6 +13,7 @@ import {
   markNotificationAsReadForUser,
   RegistryEntityName,
   resolveEntitySchoolId,
+  restoreEntityRow,
   updateEntityRow,
   userHasSchoolAccess,
   validateAttachmentOwner,
@@ -44,6 +46,8 @@ const registryEntities = [
   "communicationRecipients",
   "notifications",
   "attachments",
+  "absenceJustifications",
+  "auditLogs",
 ] as const;
 
 const entitySchema = z.enum(registryEntities);
@@ -882,6 +886,39 @@ export const registryRouter = router({
         await assertRowAccess(user, input.entity, createdRecord);
       }
 
+      // Trigger automatic notifications based on entity type
+      try {
+        const { NotificationService } = await import(
+          "../domain/notification/notification.service"
+        );
+
+        if (input.entity === "communications") {
+          await NotificationService.notifyCommunication(
+            createdRecord.id as number
+          );
+        } else if (input.entity === "schoolEvents") {
+          await NotificationService.notifyEvent(createdRecord.id as number);
+        }
+      } catch (error) {
+        // Log error but don't break the main operation
+        console.error("Failed to create automatic notifications:", error);
+      }
+
+      // Audit log for create
+      try {
+        const { AuditService } = await import("./domain/audit/audit.service");
+        await AuditService.log({
+          userId: user.id,
+          action: "create",
+          entity: input.entity,
+          entityId: createdRecord.id as number,
+          changes: JSON.stringify({ after: createdRecord }),
+          schoolId: schoolId ?? undefined,
+        });
+      } catch {
+        /* non-critical */
+      }
+
       return created;
     }),
 
@@ -947,6 +984,28 @@ export const registryRouter = router({
       }
 
       await assertRowAccess(user, input.entity, asRecord(updated));
+
+      // Audit log for update
+      try {
+        const { AuditService } = await import("./domain/audit/audit.service");
+        await AuditService.log({
+          userId: user.id,
+          action: "update",
+          entity: input.entity,
+          entityId: input.id,
+          changes: JSON.stringify({
+            before: currentRecord,
+            after: asRecord(updated),
+          }),
+          schoolId:
+            (await resolveEntitySchoolId(input.entity, currentRecord).catch(
+              () => undefined
+            )) ?? undefined,
+        });
+      } catch {
+        /* non-critical */
+      }
+
       return updated;
     }),
 
@@ -973,10 +1032,127 @@ export const registryRouter = router({
         });
       }
 
+      // Audit log for delete (soft or permanent)
+      try {
+        const { AuditService } = await import("./domain/audit/audit.service");
+        await AuditService.log({
+          userId: user.id,
+          action: entitySupportsSoftDelete(input.entity)
+            ? "soft_delete"
+            : "delete",
+          entity: input.entity,
+          entityId: input.id,
+          changes: JSON.stringify({ before: asRecord(current) }),
+          schoolId:
+            (await resolveEntitySchoolId(input.entity, asRecord(current)).catch(
+              () => undefined
+            )) ?? undefined,
+        });
+      } catch {
+        /* non-critical */
+      }
+
       return {
         success: true,
         removed,
       };
+    }),
+
+  restore: protectedProcedure
+    .input(idInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+
+      if (user.role !== "admin" && user.role !== "school_staff") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Apenas gestores podem restaurar registros",
+        });
+      }
+
+      if (!entitySupportsSoftDelete(input.entity)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Esta entidade não suporta restauração",
+        });
+      }
+
+      const current = await getEntityById(input.entity, input.id);
+      if (!current) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Registro não encontrado",
+        });
+      }
+
+      const currentRecord = asRecord(current);
+      if (!currentRecord.deletedAt) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Registro não está deletado",
+        });
+      }
+
+      await assertRowAccess(user, input.entity, currentRecord);
+
+      const restored = await restoreEntityRow(input.entity, input.id);
+      if (!restored) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Falha ao restaurar registro",
+        });
+      }
+
+      try {
+        const { AuditService } = await import("./domain/audit/audit.service");
+        await AuditService.log({
+          userId: user.id,
+          action: "restore",
+          entity: input.entity,
+          entityId: input.id,
+          schoolId:
+            (await resolveEntitySchoolId(input.entity, currentRecord).catch(
+              () => undefined
+            )) ?? undefined,
+        });
+      } catch {
+        /* non-critical */
+      }
+
+      return { success: true, restored };
+    }),
+
+  listDeleted: protectedProcedure
+    .input(
+      z.object({
+        entity: entitySchema,
+        limit: z.number().int().min(1).max(500).default(100),
+        offset: z.number().int().min(0).default(0),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const user = ctx.user!;
+
+      if (user.role !== "admin" && user.role !== "school_staff") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Apenas gestores podem ver registros deletados",
+        });
+      }
+
+      if (!entitySupportsSoftDelete(input.entity)) {
+        return [];
+      }
+
+      const rows = await listEntityRows(input.entity, {
+        limit: input.limit,
+        offset: input.offset,
+        includeDeleted: true,
+        filters: { deletedAt: "not_null" } as any,
+      });
+
+      // Filter to only rows that actually have deletedAt set
+      return rows.filter((row: unknown) => asRecord(row).deletedAt != null);
     }),
 
   notifications: router({

@@ -1,6 +1,5 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { schools as schoolsTable } from "../../../drizzle/schema";
 import { COOKIE_NAME } from "../../../packages/shared/src/const.ts";
 import { getSessionCookieOptions } from "./core/cookies";
 import { systemRouter } from "./core/systemRouter";
@@ -14,13 +13,21 @@ import {
   createTeacherProfile,
   createUserSchool,
   getContacts,
-  getDb,
   getSchoolByEmail,
   getSchoolContacts,
   getUserSchools,
   linkStudentGuardian,
+  listSchools,
   upsertUser,
 } from "./db";
+import { attendanceRouter } from "./domain/attendance/attendance.router";
+import { auditRouter } from "./domain/audit/audit.router";
+import { commentsRouter } from "./domain/comments/comments.router";
+import { communicationsRouter } from "./domain/communications/communications.router";
+import { eventsRouter } from "./domain/events/events.router";
+import { gradesRouter } from "./domain/grades/grades.router";
+import { justificationsRouter } from "./domain/justifications/justifications.router";
+import { schoolRouter } from "./domain/school/school.router";
 import { profilesRouter } from "./profiles";
 import { registryRouter } from "./registry";
 
@@ -28,6 +35,14 @@ export const appRouter = router({
   system: systemRouter,
   profiles: profilesRouter,
   registry: registryRouter,
+  comments: commentsRouter,
+  attendance: attendanceRouter,
+  grades: gradesRouter,
+  justifications: justificationsRouter,
+  communications: communicationsRouter,
+  events: eventsRouter,
+  school: schoolRouter,
+  audit: auditRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -70,8 +85,14 @@ export const appRouter = router({
           throw new Error("Falha ao enviar formulário. Tente novamente.");
         }
       }),
-    list: publicProcedure.query(async () => {
+    list: protectedProcedure.query(async ({ ctx }) => {
       try {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Usuário não autenticado",
+          });
+        }
         return await getContacts(100, 0);
       } catch (error) {
         console.error("Failed to fetch contacts:", error);
@@ -129,11 +150,15 @@ export const appRouter = router({
         }
       }),
 
-    list: publicProcedure.query(async () => {
+    list: protectedProcedure.query(async ({ ctx }) => {
       try {
-        const db = await getDb();
-        if (!db) return [];
-        const schools = await db.select().from(schoolsTable).limit(100);
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Usuário não autenticado",
+          });
+        }
+        const schools = await listSchools(100);
         return schools;
       } catch (error) {
         console.error("Failed to fetch schools:", error);
