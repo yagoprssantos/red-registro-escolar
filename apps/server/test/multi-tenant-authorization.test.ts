@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { User } from "../../../drizzle/schema";
+import type { User } from "../src/db";
 import type { TrpcContext } from "../src/core/context";
 import {
   createGuardianProfile,

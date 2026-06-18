@@ -141,5 +141,3 @@ describe("contacts router", () => {
     expect(contacts.length).toBeGreaterThan(0);
   });
 });
-
-
