@@ -1,75 +1,387 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  getTableColumns,
-  inArray,
-  isNull,
-  sql,
-} from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import { setDefaultResultOrder } from "node:dns";
-import postgres from "postgres";
-import {
-  assessments,
-  assessmentScores,
-  Attachment,
-  attachments,
-  AttendanceRecord,
-  attendanceRecords,
-  Class,
-  classEnrollments,
-  classes,
-  classSessions,
-  classSubjects,
-  classTeachers,
-  Communication,
-  CommunicationRecipient,
-  communicationRecipients,
-  communications,
-  Contact,
-  contacts,
-  EventTarget,
-  eventTargets,
-  Guardian,
-  guardians,
-  InsertContact,
-  InsertSchool,
-  InsertUser,
-  InsertUserSchool,
-  Notification,
-  notifications,
-  School,
-  SchoolEvent,
-  schoolEvents,
-  schools,
-  SchoolStaffProfile,
-  schoolStaffProfiles,
-  schoolYears,
-  Student,
-  studentComments,
-  studentGuardians,
-  students,
-  Subject,
-  subjects,
-  Teacher,
-  teachers,
-  User,
-  users,
-  UserSchool,
-  userSchools,
-} from "../../../drizzle/schema";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ENV } from "./core/env";
 
-// Render can expose IPv6 records that are unreachable from its runtime network.
-// Prefer IPv4 first to avoid intermittent ENETUNREACH during DB connections.
-setDefaultResultOrder("ipv4first");
+// ── camelCase conversion (Supabase cloud DB uses camelCase columns) ──
 
-let _db: ReturnType<typeof drizzle> | null = null;
-let _pgClient: postgres.Sql | null = null;
+// The Supabase cloud DB stores columns in camelCase (e.g. schoolId, createdAt).
+// We do NOT convert to snake_case before inserts/updates, and we do NOT
+// convert from snake_case after selects — the DB already returns camelCase.
+
+// ── Supabase Client singleton ──────────────────────────────────
+
+let _supabase: SupabaseClient | null = null;
+
 const useMemoryStore = () =>
-  process.env.NODE_ENV === "test" || !process.env.DATABASE_URL;
+  process.env.NODE_ENV === "test" || !process.env.SUPABASE_URL;
+
+function getSupabase(): SupabaseClient | null {
+  if (useMemoryStore()) return null;
+
+  if (!_supabase && ENV.supabaseUrl && ENV.supabaseServiceRoleKey) {
+    _supabase = createClient(ENV.supabaseUrl, ENV.supabaseServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+
+  return _supabase;
+}
+
+// ── Types (camelCase, matching app expectations) ───────────────
+
+export type User = {
+  id: number;
+  openId: string;
+  name: string | null;
+  email: string | null;
+  loginMethod: string | null;
+  role: string;
+  defaultProfile: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastSignedIn: Date;
+};
+
+export type InsertUser = Omit<User, "id" | "createdAt" | "updatedAt" | "lastSignedIn"> & {
+  lastSignedIn?: Date;
+};
+
+export type School = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  studentCount: number | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type InsertSchool = Omit<School, "id" | "createdAt" | "updatedAt">;
+
+export type SchoolYear = {
+  id: number;
+  schoolId: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isCurrent: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type UserSchool = {
+  id: number;
+  userId: number;
+  schoolId: number;
+  role: string;
+  createdAt: Date;
+};
+
+export type InsertUserSchool = Omit<UserSchool, "id" | "createdAt">;
+
+export type SchoolStaffProfile = {
+  id: number;
+  userId: number;
+  schoolId: number;
+  role: string;
+  positionTitle: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Teacher = {
+  id: number;
+  userId: number;
+  schoolId: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string | null;
+  active: number;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Student = {
+  id: number;
+  userId: number | null;
+  schoolId: number;
+  enrollmentNumber: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  dateOfBirth: string | null;
+  grade: string | null;
+  status: string;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Guardian = {
+  id: number;
+  userId: number | null;
+  schoolId: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  relationship: string | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Contact = {
+  id: number;
+  schoolId: number | null;
+  name: string;
+  email: string;
+  school: string;
+  role: string;
+  students: string | null;
+  message: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type InsertContact = Omit<Contact, "id" | "createdAt" | "updatedAt">;
+
+export type Subject = {
+  id: number;
+  schoolId: number;
+  name: string;
+  code: string | null;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Class = {
+  id: number;
+  schoolId: number;
+  schoolYearId: number;
+  name: string;
+  gradeLabel: string;
+  course: string | null;
+  code: string | null;
+  shift: string;
+  status: string;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ClassSubject = {
+  id: number;
+  classId: number;
+  subjectId: number;
+  createdAt: Date;
+};
+
+export type ClassTeacher = {
+  id: number;
+  classSubjectId: number;
+  teacherId: number;
+  createdAt: Date;
+};
+
+export type ClassEnrollment = {
+  id: number;
+  classId: number;
+  studentId: number;
+  enrollmentDate: string;
+  status: string;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ClassSession = {
+  id: number;
+  classSubjectId: number;
+  teacherId: number | null;
+  lessonDate: string;
+  lessonNumber: number;
+  topic: string | null;
+  notes: string | null;
+  createdAt: Date;
+};
+
+export type AttendanceRecord = {
+  id: number;
+  classSessionId: number;
+  studentId: number;
+  status: string;
+  reason: string | null;
+  recordedByTeacherId: number | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Assessment = {
+  id: number;
+  classSubjectId: number;
+  teacherId: number | null;
+  title: string;
+  description: string | null;
+  maxScore: string;
+  weight: string;
+  assessmentDate: string;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type AssessmentScore = {
+  id: number;
+  assessmentId: number;
+  studentId: number;
+  score: string;
+  feedback: string | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type StudentComment = {
+  id: number;
+  schoolId: number;
+  studentId: number;
+  teacherId: number | null;
+  classSubjectId: number | null;
+  category: string;
+  visibility: string;
+  content: string;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type SchoolEvent = {
+  id: number;
+  schoolId: number;
+  title: string;
+  description: string | null;
+  eventType: string;
+  startsAt: string;
+  endsAt: string | null;
+  createdByUserId: number | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type EventTarget = {
+  id: number;
+  eventId: number;
+  targetType: string;
+  targetRefId: number;
+  createdAt: Date;
+};
+
+export type Communication = {
+  id: number;
+  schoolId: number;
+  authorUserId: number | null;
+  title: string;
+  body: string;
+  communicationType: string;
+  relatedEventId: number | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type CommunicationRecipient = {
+  id: number;
+  communicationId: number;
+  recipientType: string;
+  recipientRefId: number;
+  readAt: Date | null;
+  createdAt: Date;
+};
+
+export type Notification = {
+  id: number;
+  userId: number;
+  notificationType: string;
+  title: string;
+  body: string;
+  actionUrl: string | null;
+  isRead: number;
+  readAt: Date | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+};
+
+export type Attachment = {
+  id: number;
+  ownerType: string;
+  ownerId: number;
+  fileUrl: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  createdAt: Date;
+};
+
+export type AbsenceJustification = {
+  id: number;
+  attendanceRecordId: number;
+  guardianId: number;
+  reason: string;
+  attachmentUrl: string | null;
+  status: string;
+  reviewedByUserId: number | null;
+  reviewedAt: Date | null;
+  reviewNotes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type AuditLog = {
+  id: number;
+  userId: number | null;
+  action: string;
+  entity: string;
+  entityId: number | null;
+  changes: string | null;
+  schoolId: number | null;
+  ipAddress: string | null;
+  createdAt: Date;
+};
+
+export type SchoolPlatform = {
+  id: number;
+  schoolId: number;
+  name: string;
+  description: string | null;
+  url: string;
+  emoji: string | null;
+  colorGradient: string | null;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ScheduleSlot = {
+  id: number;
+  schoolId: number;
+  shift: string;
+  slotNumber: number;
+  startTime: string;
+  endTime: string;
+  createdAt: Date;
+};
+
+// ── Memory Store ───────────────────────────────────────────────
 
 type MemoryStore = {
   users: User[];
@@ -77,12 +389,7 @@ type MemoryStore = {
   schools: School[];
   userSchools: UserSchool[];
   schoolStaffProfiles: SchoolStaffProfile[];
-  schoolYears: Array<{
-    id: number;
-    schoolId: number;
-    name: string;
-    isCurrent: number;
-  }>;
+  schoolYears: Array<{ id: number; schoolId: number; name: string; isCurrent: number }>;
   teachers: Teacher[];
   students: Student[];
   guardians: Guardian[];
@@ -96,24 +403,14 @@ type MemoryStore = {
   }>;
   subjects: Subject[];
   classes: Class[];
-  classSubjects: Array<{
-    id: number;
-    classId: number;
-    subjectId: number;
-    createdAt: Date;
-  }>;
-  classTeachers: Array<{
-    id: number;
-    classSubjectId: number;
-    teacherId: number;
-    createdAt: Date;
-  }>;
+  classSubjects: ClassSubject[];
+  classTeachers: ClassTeacher[];
   classEnrollments: Array<{
     id: number;
     classId: number;
     studentId: number;
     enrollmentDate: string;
-    status: "ativo" | "transferido" | "concluido";
+    status: string;
     createdAt: Date;
     updatedAt: Date;
   }>;
@@ -155,8 +452,8 @@ type MemoryStore = {
     studentId: number;
     teacherId: number | null;
     classSubjectId: number | null;
-    category: "elogio" | "melhoria" | "ocorrencia" | "comentario";
-    visibility: "student" | "guardian" | "school" | "all";
+    category: string;
+    visibility: string;
     content: string;
     createdAt: Date;
     updatedAt: Date;
@@ -167,6 +464,10 @@ type MemoryStore = {
   eventTargets: EventTarget[];
   notifications: Notification[];
   attachments: Attachment[];
+  absenceJustifications: AbsenceJustification[];
+  auditLogs: AuditLog[];
+  schoolPlatforms: SchoolPlatform[];
+  scheduleSlots: ScheduleSlot[];
 };
 
 const memory: MemoryStore = {
@@ -196,6 +497,10 @@ const memory: MemoryStore = {
   eventTargets: [],
   notifications: [],
   attachments: [],
+  absenceJustifications: [],
+  auditLogs: [],
+  schoolPlatforms: [],
+  scheduleSlots: [],
 };
 
 const memoryIds = {
@@ -225,38 +530,23 @@ const memoryIds = {
   eventTargets: 1,
   notifications: 1,
   attachments: 1,
+  absenceJustifications: 1,
+  auditLogs: 1,
+  schoolPlatforms: 1,
+  scheduleSlots: 1,
 };
 
 export function resetMemoryStore() {
   Object.assign(memory, {
-    users: [],
-    contacts: [],
-    schools: [],
-    userSchools: [],
-    schoolStaffProfiles: [],
-    schoolYears: [],
-    teachers: [],
-    students: [],
-    guardians: [],
-    studentGuardians: [],
-    subjects: [],
-    classes: [],
-    classSubjects: [],
-    classTeachers: [],
-    classEnrollments: [],
-    assessments: [],
-    assessmentScores: [],
-    classSessions: [],
-    attendanceRecords: [],
-    studentComments: [],
-    communications: [],
-    communicationRecipients: [],
-    schoolEvents: [],
-    eventTargets: [],
-    notifications: [],
-    attachments: [],
+    users: [], contacts: [], schools: [], userSchools: [],
+    schoolStaffProfiles: [], schoolYears: [], teachers: [], students: [],
+    guardians: [], studentGuardians: [], subjects: [], classes: [],
+    classSubjects: [], classTeachers: [], classEnrollments: [], assessments: [],
+    assessmentScores: [], classSessions: [], attendanceRecords: [],
+    studentComments: [], communications: [], communicationRecipients: [],
+    schoolEvents: [], eventTargets: [], notifications: [], attachments: [],
+    absenceJustifications: [], auditLogs: [], schoolPlatforms: [], scheduleSlots: [],
   });
-
   Object.keys(memoryIds).forEach(key => {
     (memoryIds as Record<string, number>)[key] = 1;
   });
@@ -266,317 +556,336 @@ function getCurrentYearName() {
   return String(new Date().getFullYear());
 }
 
+// ── Registry: entity ↔ table name mapping ─────────────────────
+
+// DB uses camelCase column names — entity mapping uses camelCase table names
+const entityTableName: Record<string, string> = {
+  users: "users",
+  schools: "schools",
+  schoolYears: "schoolYears",
+  userSchools: "userSchools",
+  schoolStaffProfiles: "schoolStaffProfiles",
+  teachers: "teachers",
+  students: "students",
+  guardians: "guardians",
+  studentGuardians: "studentGuardians",
+  contacts: "contacts",
+  subjects: "subjects",
+  classes: "classes",
+  classSubjects: "classSubjects",
+  classTeachers: "classTeachers",
+  classEnrollments: "classEnrollments",
+  classSessions: "classSessions",
+  attendanceRecords: "attendanceRecords",
+  assessments: "assessments",
+  assessmentScores: "assessmentScores",
+  studentComments: "studentComments",
+  schoolEvents: "schoolEvents",
+  eventTargets: "eventTargets",
+  communications: "communications",
+  communicationRecipients: "communicationRecipients",
+  notifications: "notifications",
+  attachments: "attachments",
+  absenceJustifications: "absenceJustifications",
+  auditLogs: "auditLogs",
+  schoolPlatforms: "schoolPlatforms",
+  scheduleSlots: "scheduleSlots",
+};
+
+export type RegistryEntityName = keyof typeof entityTableName;
+
+// Columns that exist in each table (camelCase — matches the actual DB schema)
+const entityColumns: Record<RegistryEntityName, Set<string>> = {
+  users: new Set(["id", "openId", "name", "email", "loginMethod", "role", "defaultProfile", "createdAt", "updatedAt", "lastSignedIn"]),
+  schools: new Set(["id", "name", "email", "phone", "address", "city", "state", "zipCode", "studentCount", "status", "createdAt", "updatedAt"]),
+  schoolYears: new Set(["id", "schoolId", "name", "startDate", "endDate", "isCurrent", "createdAt", "updatedAt"]),
+  userSchools: new Set(["id", "userId", "schoolId", "role", "createdAt"]),
+  schoolStaffProfiles: new Set(["id", "userId", "schoolId", "role", "positionTitle", "createdAt", "updatedAt"]),
+  teachers: new Set(["id", "userId", "schoolId", "name", "email", "phone", "subject", "active", "deletedAt", "createdAt", "updatedAt"]),
+  students: new Set(["id", "userId", "schoolId", "enrollmentNumber", "name", "email", "phone", "dateOfBirth", "grade", "status", "deletedAt", "createdAt", "updatedAt"]),
+  guardians: new Set(["id", "userId", "schoolId", "name", "email", "phone", "relationship", "deletedAt", "createdAt", "updatedAt"]),
+  studentGuardians: new Set(["id", "studentId", "guardianId", "relationship", "isPrimary", "createdAt"]),
+  contacts: new Set(["id", "schoolId", "name", "email", "school", "role", "students", "message", "status", "createdAt", "updatedAt"]),
+  subjects: new Set(["id", "schoolId", "name", "code", "description", "createdAt", "updatedAt"]),
+  classes: new Set(["id", "schoolId", "schoolYearId", "name", "gradeLabel", "course", "code", "shift", "status", "deletedAt", "createdAt", "updatedAt"]),
+  classSubjects: new Set(["id", "classId", "subjectId", "createdAt"]),
+  classTeachers: new Set(["id", "classSubjectId", "teacherId", "createdAt"]),
+  classEnrollments: new Set(["id", "classId", "studentId", "enrollmentDate", "status", "deletedAt", "createdAt", "updatedAt"]),
+  classSessions: new Set(["id", "classSubjectId", "teacherId", "lessonDate", "lessonNumber", "topic", "notes", "createdAt"]),
+  attendanceRecords: new Set(["id", "classSessionId", "studentId", "status", "reason", "recordedByTeacherId", "deletedAt", "createdAt", "updatedAt"]),
+  assessments: new Set(["id", "classSubjectId", "teacherId", "title", "description", "maxScore", "weight", "assessmentDate", "deletedAt", "createdAt", "updatedAt"]),
+  assessmentScores: new Set(["id", "assessmentId", "studentId", "score", "feedback", "deletedAt", "createdAt", "updatedAt"]),
+  studentComments: new Set(["id", "schoolId", "studentId", "teacherId", "classSubjectId", "category", "visibility", "content", "deletedAt", "createdAt", "updatedAt"]),
+  schoolEvents: new Set(["id", "schoolId", "title", "description", "eventType", "startsAt", "endsAt", "createdByUserId", "deletedAt", "createdAt", "updatedAt"]),
+  eventTargets: new Set(["id", "eventId", "targetType", "targetRefId", "createdAt"]),
+  communications: new Set(["id", "schoolId", "authorUserId", "title", "body", "communicationType", "relatedEventId", "deletedAt", "createdAt", "updatedAt"]),
+  communicationRecipients: new Set(["id", "communicationId", "recipientType", "recipientRefId", "readAt", "createdAt"]),
+  notifications: new Set(["id", "userId", "notificationType", "title", "body", "actionUrl", "isRead", "readAt", "deletedAt", "createdAt"]),
+  attachments: new Set(["id", "ownerType", "ownerId", "fileUrl", "fileName", "mimeType", "sizeBytes", "createdAt"]),
+  absenceJustifications: new Set(["id", "attendanceRecordId", "guardianId", "reason", "attachmentUrl", "status", "reviewedByUserId", "reviewedAt", "reviewNotes", "createdAt", "updatedAt"]),
+  auditLogs: new Set(["id", "userId", "action", "entity", "entityId", "changes", "schoolId", "ipAddress", "createdAt"]),
+  schoolPlatforms: new Set(["id", "schoolId", "name", "description", "url", "emoji", "colorGradient", "sortOrder", "createdAt", "updatedAt"]),
+  scheduleSlots: new Set(["id", "schoolId", "shift", "slotNumber", "startTime", "endTime", "createdAt"]),
+};
+
+function hasColumn(entity: RegistryEntityName, col: string) {
+  return entityColumns[entity]?.has(col) ?? false;
+}
+
+function sanitizeEntityPayload(
+  entity: RegistryEntityName,
+  payload: Record<string, unknown>,
+  options: { isUpdate: boolean }
+) {
+  const allowed = entityColumns[entity];
+  if (!allowed) return {};
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (!allowed.has(key)) continue;
+    if (options.isUpdate && key === "id") continue;
+    sanitized[key] = value;
+  }
+  return sanitized;
+}
+
+// ── Memory Store helpers (unchanged logic) ─────────────────────
+
+function getMemoryStoreByEntity(
+  entity: RegistryEntityName
+): Array<Record<string, unknown>> {
+  switch (entity) {
+    case "users": return memory.users as Array<Record<string, unknown>>;
+    case "schools": return memory.schools as Array<Record<string, unknown>>;
+    case "schoolYears": return memory.schoolYears as Array<Record<string, unknown>>;
+    case "userSchools": return memory.userSchools as Array<Record<string, unknown>>;
+    case "schoolStaffProfiles": return memory.schoolStaffProfiles as Array<Record<string, unknown>>;
+    case "teachers": return memory.teachers as Array<Record<string, unknown>>;
+    case "students": return memory.students as Array<Record<string, unknown>>;
+    case "guardians": return memory.guardians as Array<Record<string, unknown>>;
+    case "studentGuardians": return memory.studentGuardians as Array<Record<string, unknown>>;
+    case "contacts": return memory.contacts as Array<Record<string, unknown>>;
+    case "subjects": return memory.subjects as Array<Record<string, unknown>>;
+    case "classes": return memory.classes as Array<Record<string, unknown>>;
+    case "classSubjects": return memory.classSubjects as Array<Record<string, unknown>>;
+    case "classTeachers": return memory.classTeachers as Array<Record<string, unknown>>;
+    case "classEnrollments": return memory.classEnrollments as Array<Record<string, unknown>>;
+    case "classSessions": return memory.classSessions as Array<Record<string, unknown>>;
+    case "attendanceRecords": return memory.attendanceRecords as Array<Record<string, unknown>>;
+    case "assessments": return memory.assessments as Array<Record<string, unknown>>;
+    case "assessmentScores": return memory.assessmentScores as Array<Record<string, unknown>>;
+    case "studentComments": return memory.studentComments as Array<Record<string, unknown>>;
+    case "schoolEvents": return memory.schoolEvents as Array<Record<string, unknown>>;
+    case "eventTargets": return memory.eventTargets as Array<Record<string, unknown>>;
+    case "communications": return memory.communications as Array<Record<string, unknown>>;
+    case "communicationRecipients": return memory.communicationRecipients as Array<Record<string, unknown>>;
+    case "notifications": return memory.notifications as Array<Record<string, unknown>>;
+    case "attachments": return memory.attachments as Array<Record<string, unknown>>;
+    case "absenceJustifications": return memory.absenceJustifications as Array<Record<string, unknown>>;
+    case "auditLogs": return memory.auditLogs as Array<Record<string, unknown>>;
+    case "schoolPlatforms": return memory.schoolPlatforms as Array<Record<string, unknown>>;
+    case "scheduleSlots": return memory.scheduleSlots as Array<Record<string, unknown>>;
+    default: { const exhaustive: never = entity; throw new Error(`Unsupported entity: ${String(exhaustive)}`); }
+  }
+}
+
+function applyMemoryEntityDefaults(entity: RegistryEntityName, row: Record<string, unknown>) {
+  const withDefault = <T>(key: string, value: T) => { if (row[key] === undefined) row[key] = value; };
+  switch (entity) {
+    case "users": withDefault("role", "user"); break;
+    case "schools": withDefault("status", "trial"); break;
+    case "schoolYears": withDefault("isCurrent", 0); break;
+    case "userSchools": withDefault("role", "coordinator"); break;
+    case "teachers": withDefault("active", 1); break;
+    case "students": withDefault("status", "ativo"); break;
+    case "studentGuardians": withDefault("isPrimary", 0); break;
+    case "contacts": withDefault("status", "novo"); break;
+    case "classes": withDefault("shift", "morning"); withDefault("status", "ativo"); break;
+    case "classEnrollments": withDefault("status", "ativo"); break;
+    case "classSessions": withDefault("lessonNumber", 1); break;
+    case "attendanceRecords": withDefault("status", "present"); break;
+    case "assessments": withDefault("maxScore", "10.00"); withDefault("weight", "1.00"); break;
+    case "studentComments": withDefault("category", "comentario"); withDefault("visibility", "all"); break;
+    case "schoolEvents": withDefault("eventType", "evento_escolar"); break;
+    case "communications": withDefault("communicationType", "announcement"); break;
+    case "notifications": withDefault("notificationType", "general"); withDefault("isRead", 0); break;
+    default: break;
+  }
+}
+
+function rowMatchesFilters(row: Record<string, unknown>, filters: Record<string, unknown> | undefined) {
+  if (!filters) return true;
+  return Object.entries(filters).every(([key, value]) => {
+    if (value === undefined) return true;
+    const rowValue = row[key];
+    if (Array.isArray(value)) return value.includes(rowValue as string | number | boolean);
+    if (value === "not_null") return rowValue !== null && rowValue !== undefined;
+    return rowValue === value;
+  });
+}
+
+function toInt(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "string" && value.trim().length > 0) { const p = Number(value); if (Number.isFinite(p)) return Math.trunc(p); }
+  return null;
+}
+
+// ── Memory seed helpers (unchanged) ────────────────────────────
+
 async function ensureSchoolYearExists(schoolId: number) {
   if (useMemoryStore()) {
-    const current = memory.schoolYears.find(
-      sy => sy.schoolId === schoolId && sy.isCurrent === 1
-    );
+    const current = memory.schoolYears.find(sy => sy.schoolId === schoolId && sy.isCurrent === 1);
     if (current) return current.id;
-
-    const now = new Date();
-    const start = `${now.getFullYear()}-01-01`;
-    const end = `${now.getFullYear()}-12-31`;
     const id = memoryIds.schoolYears++;
-    memory.schoolYears.push({
-      id,
-      schoolId,
-      name: getCurrentYearName(),
-      isCurrent: 1,
-    });
-
+    memory.schoolYears.push({ id, schoolId, name: getCurrentYearName(), isCurrent: 1 });
     return id;
   }
+  const supabase = getSupabase();
+  if (!supabase) return null;
 
-  const db = await getDb();
-  if (!db) return null;
-
-  const existing = await db
-    .select({ id: schoolYears.id })
-    .from(schoolYears)
-    .where(
-      and(eq(schoolYears.schoolId, schoolId), eq(schoolYears.isCurrent, 1))
-    )
+  const { data: existing } = await supabase
+    .from("schoolYears")
+    .select("id")
+    .eq("schoolId", schoolId)
+    .eq("isCurrent", 1)
     .limit(1);
 
-  if (existing[0]) return existing[0].id;
+  if (existing && existing.length > 0) return existing[0].id;
 
   const now = new Date();
   const startDate = `${now.getFullYear()}-01-01`;
   const endDate = `${now.getFullYear()}-12-31`;
-  const created = await db
-    .insert(schoolYears)
-    .values({
-      schoolId,
-      name: getCurrentYearName(),
-      startDate,
-      endDate,
-      isCurrent: 1,
-    })
-    .returning({ id: schoolYears.id });
+  const { data: created } = await supabase
+    .from("schoolYears")
+    .insert({ schoolId, name: getCurrentYearName(), startDate, endDate, isCurrent: 1 })
+    .select("id")
+    .single();
 
-  return created[0]?.id ?? null;
+  return created?.id ?? null;
 }
 
-function seedTeacherAcademicDataInMemory(
-  teacherId: number,
-  schoolId: number,
-  subjectName?: string
-) {
-  const schoolYearId =
-    memory.schoolYears.find(x => x.schoolId === schoolId && x.isCurrent === 1)
-      ?.id ??
-    (() => {
-      const id = memoryIds.schoolYears++;
-      memory.schoolYears.push({
-        id,
-        schoolId,
-        name: getCurrentYearName(),
-        isCurrent: 1,
-      });
-      return id;
-    })();
+function seedSchoolPlatforms(schoolId: number) {
+  const defaults = [
+    { name: "Google Classroom", description: "Acesse suas turmas, tarefas e materiais digitais.", url: "https://classroom.google.com", emoji: "📚", colorGradient: "from-blue-500 to-blue-700", sortOrder: 0 },
+    { name: "SISEDU", description: "Sistema de Gestão Educacional do Ceará.", url: "https://sisedu.educacao.ce.gov.br", emoji: "🏫", colorGradient: "from-green-500 to-green-700", sortOrder: 1 },
+    { name: "SIC", description: "Consultas e informações do sistema educacional.", url: "https://sic.ceara.gov.br", emoji: "📋", colorGradient: "from-amber-500 to-amber-700", sortOrder: 2 },
+    { name: "Enem na Rede", description: "Plataforma de preparação para o ENEM.", url: "https://enemnapoliedro.com.br", emoji: "🎯", colorGradient: "from-purple-500 to-purple-700", sortOrder: 3 },
+    { name: "Conexão Educação", description: "Recursos educacionais e formação continuada.", url: "https://conexaoeducacao.educacao.ce.gov.br", emoji: "🌐", colorGradient: "from-red-500 to-red-700", sortOrder: 4 },
+  ];
+  for (const p of defaults) {
+    const exists = memory.schoolPlatforms.some(sp => sp.schoolId === schoolId && sp.name === p.name);
+    if (exists) continue;
+    memory.schoolPlatforms.push({ id: memoryIds.schoolPlatforms++, schoolId, ...p, createdAt: new Date(), updatedAt: new Date() });
+  }
+}
 
-  const subjectId = (() => {
-    const found = memory.subjects.find(
-      s => s.schoolId === schoolId && s.name === (subjectName || "Matematica")
-    );
-    if (found) return found.id;
+function seedScheduleSlots(schoolId: number) {
+  const shifts = ["morning"];
+  const slots = [
+    { slotNumber: 1, startTime: "07:00", endTime: "07:45" },
+    { slotNumber: 2, startTime: "07:45", endTime: "08:30" },
+    { slotNumber: 3, startTime: "08:30", endTime: "09:15" },
+    { slotNumber: 4, startTime: "09:30", endTime: "10:15" },
+    { slotNumber: 5, startTime: "10:15", endTime: "11:00" },
+    { slotNumber: 6, startTime: "11:00", endTime: "11:45" },
+  ];
+  for (const shift of shifts) {
+    for (const slot of slots) {
+      const exists = memory.scheduleSlots.some(s => s.schoolId === schoolId && s.shift === shift && s.slotNumber === slot.slotNumber);
+      if (exists) continue;
+      memory.scheduleSlots.push({ id: memoryIds.scheduleSlots++, schoolId, shift, ...slot, createdAt: new Date() });
+    }
+  }
+}
 
-    const id = memoryIds.subjects++;
-    memory.subjects.push({
-      id,
-      schoolId,
-      name: subjectName || "Matematica",
-      code: null,
-      description: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return id;
-  })();
-
-  const classId = (() => {
-    const existingClass = memory.classes.find(
-      c =>
-        c.schoolId === schoolId &&
-        c.name === "6A" &&
-        c.schoolYearId === schoolYearId
-    );
-    if (existingClass) return existingClass.id;
-
-    const id = memoryIds.classes++;
-    memory.classes.push({
-      id,
-      schoolId,
-      schoolYearId,
-      name: "6A",
-      gradeLabel: "6o Ano A",
-      shift: "morning",
-      status: "ativo",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return id;
-  })();
-
-  const classSubjectId = (() => {
-    const found = memory.classSubjects.find(
-      cs => cs.classId === classId && cs.subjectId === subjectId
-    );
-    if (found) return found.id;
-
-    const id = memoryIds.classSubjects++;
-    memory.classSubjects.push({
-      id,
-      classId,
-      subjectId,
-      createdAt: new Date(),
-    });
-    return id;
-  })();
-
-  const existingTeacherLink = memory.classTeachers.find(
-    ct => ct.classSubjectId === classSubjectId && ct.teacherId === teacherId
-  );
-  if (!existingTeacherLink) {
-    memory.classTeachers.push({
-      id: memoryIds.classTeachers++,
-      classSubjectId,
-      teacherId,
-      createdAt: new Date(),
-    });
+function seedTeacherAcademicDataInMemory(teacherId: number, schoolId: number, subjectName?: string) {
+  const schoolYearId = memory.schoolYears.find(x => x.schoolId === schoolId && x.isCurrent === 1)?.id ?? (() => { const id = memoryIds.schoolYears++; memory.schoolYears.push({ id, schoolId, name: getCurrentYearName(), isCurrent: 1 }); return id; })();
+  const subjectId = (() => { const found = memory.subjects.find(s => s.schoolId === schoolId && s.name === (subjectName || "Matematica")); if (found) return found.id; const id = memoryIds.subjects++; memory.subjects.push({ id, schoolId, name: subjectName || "Matematica", code: null, description: null, createdAt: new Date(), updatedAt: new Date() }); return id; })();
+  const classId = (() => { const ec = memory.classes.find(c => c.schoolId === schoolId && c.name === "6A" && c.schoolYearId === schoolYearId); if (ec) return ec.id; const id = memoryIds.classes++; memory.classes.push({ id, schoolId, schoolYearId, name: "6A", gradeLabel: "6o Ano A", course: null, code: null, shift: "morning", status: "ativo", deletedAt: null, createdAt: new Date(), updatedAt: new Date() }); return id; })();
+  const classSubjectId = (() => { const found = memory.classSubjects.find(cs => cs.classId === classId && cs.subjectId === subjectId); if (found) return found.id; const id = memoryIds.classSubjects++; memory.classSubjects.push({ id, classId, subjectId, createdAt: new Date() }); return id; })();
+  if (!memory.classTeachers.some(ct => ct.classSubjectId === classSubjectId && ct.teacherId === teacherId)) {
+    memory.classTeachers.push({ id: memoryIds.classTeachers++, classSubjectId, teacherId, createdAt: new Date() });
   }
 }
 
 function seedStudentAcademicDataInMemory(studentId: number, schoolId: number) {
   const classInSchool = memory.classes.find(c => c.schoolId === schoolId);
   if (!classInSchool) return;
-
-  const hasEnrollment = memory.classEnrollments.some(
-    e => e.classId === classInSchool.id && e.studentId === studentId
-  );
-  if (!hasEnrollment) {
-    memory.classEnrollments.push({
-      id: memoryIds.classEnrollments++,
-      classId: classInSchool.id,
-      studentId,
-      enrollmentDate: new Date().toISOString().slice(0, 10),
-      status: "ativo",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  if (!memory.classEnrollments.some(e => e.classId === classInSchool.id && e.studentId === studentId)) {
+    memory.classEnrollments.push({ id: memoryIds.classEnrollments++, classId: classInSchool.id, studentId, enrollmentDate: new Date().toISOString().slice(0, 10), status: "ativo", createdAt: new Date(), updatedAt: new Date() });
   }
-
-  const classSubject = memory.classSubjects.find(
-    cs => cs.classId === classInSchool.id
-  );
+  const classSubject = memory.classSubjects.find(cs => cs.classId === classInSchool.id);
   if (!classSubject) return;
-
-  const teacherId =
-    memory.classTeachers.find(ct => ct.classSubjectId === classSubject.id)
-      ?.teacherId ?? null;
-
-  const assessmentId = (() => {
-    const existing = memory.assessments.find(
-      a => a.classSubjectId === classSubject.id
-    );
-    if (existing) return existing.id;
-
-    const id = memoryIds.assessments++;
-    memory.assessments.push({
-      id,
-      classSubjectId: classSubject.id,
-      teacherId,
-      title: "Avaliacao Diagnostica",
-      description: null,
-      maxScore: "10.00",
-      weight: "1.00",
-      assessmentDate: new Date().toISOString().slice(0, 10),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return id;
-  })();
-
-  const hasScore = memory.assessmentScores.some(
-    score =>
-      score.assessmentId === assessmentId && score.studentId === studentId
-  );
-  if (!hasScore) {
-    memory.assessmentScores.push({
-      id: memoryIds.assessmentScores++,
-      assessmentId,
-      studentId,
-      score: "8.50",
-      feedback: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  const teacherId = memory.classTeachers.find(ct => ct.classSubjectId === classSubject.id)?.teacherId ?? null;
+  const assessmentId = (() => { const existing = memory.assessments.find(a => a.classSubjectId === classSubject.id); if (existing) return existing.id; const id = memoryIds.assessments++; memory.assessments.push({ id, classSubjectId: classSubject.id, teacherId, title: "Avaliacao Diagnostica", description: null, maxScore: "10.00", weight: "1.00", assessmentDate: new Date().toISOString().slice(0, 10), createdAt: new Date(), updatedAt: new Date() }); return id; })();
+  if (!memory.assessmentScores.some(s => s.assessmentId === assessmentId && s.studentId === studentId)) {
+    memory.assessmentScores.push({ id: memoryIds.assessmentScores++, assessmentId, studentId, score: "8.50", feedback: null, createdAt: new Date(), updatedAt: new Date() });
   }
-
-  const classSessionId = (() => {
-    const existing = memory.classSessions.find(
-      cs => cs.classSubjectId === classSubject.id
-    );
-    if (existing) return existing.id;
-
-    const id = memoryIds.classSessions++;
-    memory.classSessions.push({
-      id,
-      classSubjectId: classSubject.id,
-      teacherId,
-      lessonDate: new Date().toISOString().slice(0, 10),
-      lessonNumber: 1,
-      topic: "Revisao",
-      notes: null,
-      createdAt: new Date(),
-    });
-    return id;
-  })();
-
-  const hasAttendance = memory.attendanceRecords.some(
-    ar => ar.classSessionId === classSessionId && ar.studentId === studentId
-  );
-  if (!hasAttendance) {
-    memory.attendanceRecords.push({
-      id: memoryIds.attendanceRecords++,
-      classSessionId,
-      studentId,
-      status: "present",
-      reason: null,
-      recordedByTeacherId: teacherId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  const classSessionId = (() => { const existing = memory.classSessions.find(cs => cs.classSubjectId === classSubject.id); if (existing) return existing.id; const id = memoryIds.classSessions++; memory.classSessions.push({ id, classSubjectId: classSubject.id, teacherId, lessonDate: new Date().toISOString().slice(0, 10), lessonNumber: 1, topic: "Revisao", notes: null, createdAt: new Date() }); return id; })();
+  if (!memory.attendanceRecords.some(ar => ar.classSessionId === classSessionId && ar.studentId === studentId)) {
+    memory.attendanceRecords.push({ id: memoryIds.attendanceRecords++, classSessionId, studentId, status: "present", reason: null, recordedByTeacherId: teacherId, deletedAt: null, createdAt: new Date(), updatedAt: new Date() });
   }
 }
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
-export async function getDb() {
-  if (useMemoryStore()) {
-    return null;
-  }
+// ── Supabase query helpers ─────────────────────────────────────
 
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _pgClient = postgres(process.env.DATABASE_URL, {
-        ssl: "require",
-      });
-      _db = drizzle(_pgClient);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-      _pgClient = null;
+async function supaSelectOne<T>(table: string, query: Record<string, unknown>): Promise<T | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  let q = supabase.from(table).select().limit(1);
+  for (const [key, value] of Object.entries(query)) {
+    if (value === null) {
+      q = q.is(key, null);
+    } else {
+      q = q.eq(key, value);
     }
   }
-
-  return _db;
+  const { data, error } = await q;
+  if (error || !data || data.length === 0) return null;
+  return data[0] as T;
 }
+
+async function supaInsert<T>(table: string, data: Record<string, unknown>): Promise<T | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data: created, error } = await supabase.from(table).insert(data).select();
+  if (error || !created || created.length === 0) { if (error) console.error("[DB] supaInsert error:", error.message); return null; }
+  return created[0] as T;
+}
+
+async function supaUpdate<T>(table: string, id: number, data: Record<string, unknown>): Promise<T | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data: updated, error } = await supabase.from(table).update(data).eq("id", id).select();
+  if (error || !updated || updated.length === 0) return null;
+  return updated[0] as T;
+}
+
+// ── Exported DB functions ───────────────────────────────────────
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (useMemoryStore()) {
-    if (!user.openId) {
-      throw new Error("User openId is required for upsert");
-    }
-
-    const existingIndex = memory.users.findIndex(
-      entry => entry.openId === user.openId
-    );
-
+    if (!user.openId) throw new Error("User openId is required for upsert");
+    const existingIndex = memory.users.findIndex(entry => entry.openId === user.openId);
     const now = new Date();
     const baseUser: User = {
-      id:
-        existingIndex >= 0
-          ? memory.users[existingIndex]!.id
-          : memoryIds.users++,
+      id: existingIndex >= 0 ? memory.users[existingIndex]!.id : memoryIds.users++,
       openId: user.openId,
       email: user.email ?? null,
       name: user.name ?? null,
       loginMethod: user.loginMethod ?? null,
       role: user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
       defaultProfile: user.defaultProfile ?? null,
-      createdAt:
-        existingIndex >= 0 ? memory.users[existingIndex]!.createdAt : now,
+      createdAt: existingIndex >= 0 ? memory.users[existingIndex]!.createdAt : now,
       updatedAt: now,
       lastSignedIn: user.lastSignedIn ?? now,
     };
-
-    if (existingIndex >= 0) {
-      memory.users[existingIndex] = {
-        ...memory.users[existingIndex]!,
-        ...baseUser,
-      };
-    } else {
-      memory.users.push(baseUser);
-    }
-
+    if (existingIndex >= 0) { memory.users[existingIndex] = { ...memory.users[existingIndex]!, ...baseUser }; }
+    else { memory.users.push(baseUser); }
     return;
   }
-
-  const db = await getDb();
-  if (!db || !user.openId) return;
-
-  const values: InsertUser = {
+  const supabase = getSupabase();
+  if (!supabase || !user.openId) return;
+  const payload = {
     openId: user.openId,
     name: user.name ?? null,
     email: user.email ?? null,
@@ -585,1769 +894,551 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     defaultProfile: user.defaultProfile ?? null,
     lastSignedIn: user.lastSignedIn ?? new Date(),
   };
-
-  await db
-    .insert(users)
-    .values(values)
-    .onConflictDoUpdate({
-      target: users.openId,
-      set: {
-        name: values.name,
-        email: values.email,
-        loginMethod: values.loginMethod,
-        role: values.role,
-        defaultProfile: values.defaultProfile,
-        lastSignedIn: values.lastSignedIn,
-      },
-    });
+  const { error } = await supabase.from("users").upsert(payload, { onConflict: "openId" }).select();
+  if (error) console.error("[DB] upsertUser error:", error.message);
 }
 
 export async function getUserByOpenId(openId: string) {
-  if (useMemoryStore()) {
-    return memory.users.find(user => user.openId === openId);
-  }
-
-  const db = await getDb();
-  if (!db) return undefined;
-
-  const result = await db
-    .select()
-    .from(users)
-    .where(eq(users.openId, openId))
-    .limit(1);
-
-  return result[0];
+  if (useMemoryStore()) return memory.users.find(user => user.openId === openId);
+  return await supaSelectOne<User>("users", { openId });
 }
 
-export async function createContact(
-  contact: InsertContact
-): Promise<Contact | null> {
+export async function createContact(contact: InsertContact): Promise<Contact | null> {
   if (useMemoryStore()) {
-    const created: Contact = {
-      id: memoryIds.contacts++,
-      schoolId: contact.schoolId ?? null,
-      name: contact.name,
-      email: contact.email,
-      school: contact.school,
-      role: contact.role,
-      students: contact.students ?? null,
-      message: contact.message ?? null,
-      status: contact.status ?? "novo",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const created: Contact = { id: memoryIds.contacts++, schoolId: contact.schoolId ?? null, name: contact.name, email: contact.email, school: contact.school, role: contact.role, students: contact.students ?? null, message: contact.message ?? null, status: contact.status ?? "novo", createdAt: new Date(), updatedAt: new Date() };
     memory.contacts.push(created);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const created = await db.insert(contacts).values(contact).returning();
-  return created[0] ?? null;
+  return await supaInsert<Contact>("contacts", { ...contact });
 }
 
 export async function getContacts(limit: number = 50, offset: number = 0) {
-  if (useMemoryStore()) {
-    return memory.contacts.slice(offset, offset + limit);
-  }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db
-    .select()
-    .from(contacts)
-    .orderBy(desc(contacts.createdAt))
-    .limit(limit)
-    .offset(offset);
+  if (useMemoryStore()) return memory.contacts.slice(offset, offset + limit);
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("contacts").select("*").order("createdAt", { ascending: false }).range(offset, offset + limit - 1);
+  return data ? (data as Contact[]) : [];
 }
 
-export async function createSchool(
-  school: InsertSchool
-): Promise<School | null> {
+export async function createSchool(school: InsertSchool): Promise<School | null> {
   if (useMemoryStore()) {
-    const created: School = {
-      id: memoryIds.schools++,
-      name: school.name,
-      email: school.email,
-      phone: school.phone ?? null,
-      address: school.address ?? null,
-      city: school.city ?? null,
-      state: school.state ?? null,
-      zipCode: school.zipCode ?? null,
-      studentCount: school.studentCount ?? null,
-      status: school.status ?? "trial",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
+    const created: School = { id: memoryIds.schools++, name: school.name, email: school.email, phone: school.phone ?? null, address: school.address ?? null, city: school.city ?? null, state: school.state ?? null, zipCode: school.zipCode ?? null, studentCount: school.studentCount ?? null, status: school.status ?? "trial", createdAt: new Date(), updatedAt: new Date() };
     memory.schools.push(created);
     await ensureSchoolYearExists(created.id);
+    seedSchoolPlatforms(created.id);
+    seedScheduleSlots(created.id);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const created = await db.insert(schools).values(school).returning();
-  if (!created[0]) return null;
-
-  await ensureSchoolYearExists(created[0].id);
-
-  return created[0] ?? null;
+  const created = await supaInsert<School>("schools", { ...school });
+  if (created) await ensureSchoolYearExists(created.id);
+  return created;
 }
 
-export async function getSchoolByEmail(
-  email: string
-): Promise<School | undefined> {
+export async function getSchoolByEmail(email: string): Promise<School | undefined> {
+  if (useMemoryStore()) return memory.schools.find(school => school.email === email);
+  const result = await supaSelectOne<School>("schools", { email });
+  return result ?? undefined;
+}
+
+export async function getUserSchools(userId: number): Promise<(UserSchool & { school: School })[]> {
   if (useMemoryStore()) {
-    return memory.schools.find(school => school.email === email);
+    return memory.userSchools.filter(us => us.userId === userId).map(us => ({ ...us, school: memory.schools.find(school => school.id === us.schoolId)! })).filter(entry => Boolean(entry.school));
   }
-
-  const db = await getDb();
-  if (!db) return undefined;
-
-  const result = await db
-    .select()
-    .from(schools)
-    .where(eq(schools.email, email))
-    .limit(1);
-
-  return result[0];
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("userSchools").select("*, schools:schoolId(*)").eq("userId", userId);
+  if (!data) return [];
+  return data.map(row => {
+    const camelRow = row as UserSchool;
+    const schoolData = (row as Record<string, unknown>).schools as Record<string, unknown>;
+    return { ...camelRow, school: schoolData as School };
+  });
 }
 
-export async function getUserSchools(
-  userId: number
-): Promise<(UserSchool & { school: School })[]> {
+export async function createUserSchool(userSchool: InsertUserSchool): Promise<UserSchool | null> {
   if (useMemoryStore()) {
-    return memory.userSchools
-      .filter(userSchool => userSchool.userId === userId)
-      .map(userSchool => ({
-        ...userSchool,
-        school: memory.schools.find(
-          school => school.id === userSchool.schoolId
-        )!,
-      }))
-      .filter(entry => Boolean(entry.school));
-  }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const result = await db
-    .select()
-    .from(userSchools)
-    .innerJoin(schools, eq(userSchools.schoolId, schools.id))
-    .where(eq(userSchools.userId, userId));
-
-  return result.map(row => ({
-    ...row.userSchools,
-    school: row.schools,
-  }));
-}
-
-export async function createUserSchool(
-  userSchool: InsertUserSchool
-): Promise<UserSchool | null> {
-  if (useMemoryStore()) {
-    const existing = memory.userSchools.find(
-      us =>
-        us.userId === userSchool.userId && us.schoolId === userSchool.schoolId
-    );
+    const existing = memory.userSchools.find(us => us.userId === userSchool.userId && us.schoolId === userSchool.schoolId);
     if (existing) return existing;
-
-    const created: UserSchool = {
-      id: memoryIds.userSchools++,
-      userId: userSchool.userId,
-      schoolId: userSchool.schoolId,
-      role: userSchool.role ?? "coordinator",
-      createdAt: new Date(),
-    };
+    const created: UserSchool = { id: memoryIds.userSchools++, userId: userSchool.userId, schoolId: userSchool.schoolId, role: userSchool.role ?? "coordinator", createdAt: new Date() };
     memory.userSchools.push(created);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  await db
-    .insert(userSchools)
-    .values(userSchool)
-    .onConflictDoUpdate({
-      target: [userSchools.userId, userSchools.schoolId],
-      set: {
-        role: userSchool.role ?? "coordinator",
-      },
-    });
-
-  const created = await db
-    .select()
-    .from(userSchools)
-    .where(
-      and(
-        eq(userSchools.userId, userSchool.userId),
-        eq(userSchools.schoolId, userSchool.schoolId)
-      )
-    )
-    .limit(1);
-
-  return created[0] ?? null;
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("userSchools").upsert({ ...userSchool }, { onConflict: "userId,schoolId" }).select();
+  if (error || !data || data.length === 0) return null;
+  return data[0] as UserSchool;
 }
 
 export async function getSchoolContacts(schoolId: number): Promise<Contact[]> {
-  if (useMemoryStore()) {
-    return memory.contacts.filter(c => c.schoolId === schoolId).slice(0, 100);
-  }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db
-    .select()
-    .from(contacts)
-    .where(eq(contacts.schoolId, schoolId))
-    .orderBy(desc(contacts.createdAt))
-    .limit(100);
+  if (useMemoryStore()) return memory.contacts.filter(c => c.schoolId === schoolId).slice(0, 100);
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("contacts").select("*").eq("schoolId", schoolId).order("createdAt", { ascending: false }).limit(100);
+  return data ? (data as Contact[]) : [];
 }
 
-export async function createTeacherProfile(input: {
-  userId: number;
-  schoolId: number;
-  name: string;
-  email: string;
-  phone?: string | null;
-  subject?: string | null;
-}) {
+export async function createTeacherProfile(input: { userId: number; schoolId: number; name: string; email: string; phone?: string | null; subject?: string | null }) {
   if (useMemoryStore()) {
-    const existing = memory.teachers.find(
-      teacher =>
-        teacher.userId === input.userId && teacher.schoolId === input.schoolId
-    );
-
+    const existing = memory.teachers.find(t => t.userId === input.userId && t.schoolId === input.schoolId);
     if (existing) return existing;
-
-    const created: Teacher = {
-      id: memoryIds.teachers++,
-      userId: input.userId,
-      schoolId: input.schoolId,
-      name: input.name,
-      email: input.email,
-      phone: input.phone ?? null,
-      subject: input.subject ?? null,
-      active: 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
+    const created: Teacher = { id: memoryIds.teachers++, userId: input.userId, schoolId: input.schoolId, name: input.name, email: input.email, phone: input.phone ?? null, subject: input.subject ?? null, active: 1, deletedAt: null, createdAt: new Date(), updatedAt: new Date() };
     memory.teachers.push(created);
-    seedTeacherAcademicDataInMemory(
-      created.id,
-      created.schoolId,
-      created.subject ?? undefined
-    );
-
+    seedTeacherAcademicDataInMemory(created.id, created.schoolId, created.subject ?? undefined);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  await db.insert(teachers).values({
-    userId: input.userId,
-    schoolId: input.schoolId,
-    name: input.name,
-    email: input.email,
-    phone: input.phone ?? null,
-    subject: input.subject ?? null,
-    active: 1,
-  });
-
-  const created = await db
-    .select()
-    .from(teachers)
-    .where(
-      and(
-        eq(teachers.userId, input.userId),
-        eq(teachers.schoolId, input.schoolId)
-      )
-    )
-    .limit(1);
-
-  return created[0] ?? null;
+  return await supaInsert<Teacher>("teachers", { ...input, active: 1 });
 }
 
-export async function createGuardianProfile(input: {
-  userId: number;
-  schoolId: number;
-  name: string;
-  email: string;
-  phone?: string | null;
-  relationship?: string | null;
-}) {
+export async function createGuardianProfile(input: { userId: number; schoolId: number; name: string; email: string; phone?: string | null; relationship?: string | null }) {
   if (useMemoryStore()) {
-    const existing = memory.guardians.find(
-      guardian =>
-        guardian.userId === input.userId && guardian.schoolId === input.schoolId
-    );
-
+    const existing = memory.guardians.find(g => g.userId === input.userId && g.schoolId === input.schoolId);
     if (existing) return existing;
-
-    const created: Guardian = {
-      id: memoryIds.guardians++,
-      userId: input.userId,
-      schoolId: input.schoolId,
-      name: input.name,
-      email: input.email,
-      phone: input.phone ?? null,
-      relationship: input.relationship ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
+    const created: Guardian = { id: memoryIds.guardians++, userId: input.userId, schoolId: input.schoolId, name: input.name, email: input.email, phone: input.phone ?? null, relationship: input.relationship ?? null, deletedAt: null, createdAt: new Date(), updatedAt: new Date() };
     memory.guardians.push(created);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  await db.insert(guardians).values({
-    userId: input.userId,
-    schoolId: input.schoolId,
-    name: input.name,
-    email: input.email,
-    phone: input.phone ?? null,
-    relationship: input.relationship ?? null,
-  });
-
-  const created = await db
-    .select()
-    .from(guardians)
-    .where(
-      and(
-        eq(guardians.userId, input.userId),
-        eq(guardians.schoolId, input.schoolId)
-      )
-    )
-    .limit(1);
-
-  return created[0] ?? null;
+  return await supaInsert<Guardian>("guardians", { ...input });
 }
 
-export async function createSchoolStaffProfile(input: {
-  userId: number;
-  schoolId: number;
-  role: "admin" | "director" | "coordinator";
-  positionTitle?: string | null;
-}) {
+export async function createSchoolStaffProfile(input: { userId: number; schoolId: number; role: "admin" | "director" | "coordinator"; positionTitle?: string | null }) {
   if (useMemoryStore()) {
-    const existingProfile = memory.schoolStaffProfiles.find(
-      profile =>
-        profile.userId === input.userId &&
-        profile.schoolId === input.schoolId &&
-        profile.role === input.role
-    );
-    if (existingProfile) {
-      return existingProfile;
-    }
-
-    const createdProfile: SchoolStaffProfile = {
-      id: memoryIds.schoolStaffProfiles++,
-      userId: input.userId,
-      schoolId: input.schoolId,
-      role: input.role,
-      positionTitle: input.positionTitle ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const existingProfile = memory.schoolStaffProfiles.find(p => p.userId === input.userId && p.schoolId === input.schoolId && p.role === input.role);
+    if (existingProfile) return existingProfile;
+    const createdProfile: SchoolStaffProfile = { id: memoryIds.schoolStaffProfiles++, userId: input.userId, schoolId: input.schoolId, role: input.role, positionTitle: input.positionTitle ?? null, createdAt: new Date(), updatedAt: new Date() };
     memory.schoolStaffProfiles.push(createdProfile);
-
-    const createdUserSchool: UserSchool = {
-      id: memoryIds.userSchools++,
-      userId: input.userId,
-      schoolId: input.schoolId,
-      role:
-        input.role === "coordinator"
-          ? "coordinator"
-          : input.role === "director"
-            ? "director"
-            : "admin",
-      createdAt: new Date(),
-    };
+    const role = input.role === "coordinator" ? "coordinator" : input.role === "director" ? "director" : "admin";
+    const createdUserSchool: UserSchool = { id: memoryIds.userSchools++, userId: input.userId, schoolId: input.schoolId, role, createdAt: new Date() };
     memory.userSchools.push(createdUserSchool);
     return createdProfile;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  await db.insert(schoolStaffProfiles).values({
-    userId: input.userId,
-    schoolId: input.schoolId,
-    role: input.role,
-    positionTitle: input.positionTitle ?? null,
-  });
-
-  return await createUserSchool({
-    userId: input.userId,
-    schoolId: input.schoolId,
-    role:
-      input.role === "coordinator"
-        ? "coordinator"
-        : input.role === "director"
-          ? "director"
-          : "admin",
-  });
+  await supaInsert<SchoolStaffProfile>("schoolStaffProfiles", { ...input });
+  return await createUserSchool({ userId: input.userId, schoolId: input.schoolId, role: input.role === "coordinator" ? "coordinator" : input.role === "director" ? "director" : "admin" });
 }
 
-export async function createStudentProfile(input: {
-  schoolId: number;
-  userId?: number | null;
-  name: string;
-  email?: string | null;
-  phone?: string | null;
-  grade?: string | null;
-}) {
+export async function createStudentProfile(input: { schoolId: number; userId?: number | null; name: string; email?: string | null; phone?: string | null; grade?: string | null }) {
   if (useMemoryStore()) {
-    const created: Student = {
-      id: memoryIds.students++,
-      userId: input.userId ?? null,
-      schoolId: input.schoolId,
-      enrollmentNumber: `MAT-${Date.now()}-${memoryIds.students}`,
-      name: input.name,
-      email: input.email ?? null,
-      phone: input.phone ?? null,
-      dateOfBirth: null,
-      grade: input.grade ?? null,
-      status: "ativo",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
+    const created: Student = { id: memoryIds.students++, userId: input.userId ?? null, schoolId: input.schoolId, enrollmentNumber: `MAT-${Date.now()}-${memoryIds.students}`, name: input.name, email: input.email ?? null, phone: input.phone ?? null, dateOfBirth: null, grade: input.grade ?? null, status: "ativo", deletedAt: null, createdAt: new Date(), updatedAt: new Date() };
     memory.students.push(created);
     seedStudentAcademicDataInMemory(created.id, created.schoolId);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const created = await db
-    .insert(students)
-    .values({
-      userId: input.userId ?? null,
-      schoolId: input.schoolId,
-      enrollmentNumber: `MAT-${Date.now()}-${Math.round(Math.random() * 9999)}`,
-      name: input.name,
-      email: input.email ?? null,
-      phone: input.phone ?? null,
-      grade: input.grade ?? null,
-      status: "ativo",
-    })
-    .returning();
-
-  return created[0] ?? null;
+  return await supaInsert<Student>("students", {
+    userId: input.userId ?? null,
+    schoolId: input.schoolId,
+    enrollmentNumber: `MAT-${Date.now()}-${Math.round(Math.random() * 9999)}`,
+    name: input.name,
+    email: input.email ?? null,
+    phone: input.phone ?? null,
+    grade: input.grade ?? null,
+    status: "ativo",
+  });
 }
 
-export async function linkStudentGuardian(input: {
-  studentId: number;
-  guardianId: number;
-  relationship?: string | null;
-  isPrimary?: number;
-}) {
+export async function linkStudentGuardian(input: { studentId: number; guardianId: number; relationship?: string | null; isPrimary?: number }) {
   if (useMemoryStore()) {
-    const existing = memory.studentGuardians.find(
-      sg =>
-        sg.studentId === input.studentId && sg.guardianId === input.guardianId
-    );
+    const existing = memory.studentGuardians.find(sg => sg.studentId === input.studentId && sg.guardianId === input.guardianId);
     if (existing) return existing;
-
-    const created = {
-      id: memoryIds.studentGuardians++,
-      studentId: input.studentId,
-      guardianId: input.guardianId,
-      relationship: input.relationship ?? null,
-      isPrimary: input.isPrimary ?? 0,
-      createdAt: new Date(),
-    };
+    const created = { id: memoryIds.studentGuardians++, studentId: input.studentId, guardianId: input.guardianId, relationship: input.relationship ?? null, isPrimary: input.isPrimary ?? 0, createdAt: new Date() };
     memory.studentGuardians.push(created);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  await db.insert(studentGuardians).values({
-    studentId: input.studentId,
-    guardianId: input.guardianId,
-    relationship: input.relationship ?? null,
-    isPrimary: input.isPrimary ?? 0,
-  });
-
-  const created = await db
-    .select()
-    .from(studentGuardians)
-    .where(
-      and(
-        eq(studentGuardians.studentId, input.studentId),
-        eq(studentGuardians.guardianId, input.guardianId)
-      )
-    )
-    .limit(1);
-
-  return created[0] ?? null;
+  return await supaInsert("studentGuardians", { ...input, isPrimary: input.isPrimary ?? 0 });
 }
 
-export async function createStudentComment(input: {
-  schoolId: number;
-  studentId: number;
-  teacherId?: number | null;
-  classSubjectId?: number | null;
-  category?: "elogio" | "melhoria" | "ocorrencia" | "comentario";
-  visibility?: "student" | "guardian" | "school" | "all";
-  content: string;
-}) {
+export async function createStudentComment(input: { schoolId: number; studentId: number; teacherId?: number | null; classSubjectId?: number | null; category?: string; visibility?: string; content: string }) {
   if (useMemoryStore()) {
-    const created = {
-      id: memoryIds.studentComments++,
-      schoolId: input.schoolId,
-      studentId: input.studentId,
-      teacherId: input.teacherId ?? null,
-      classSubjectId: input.classSubjectId ?? null,
-      category: input.category ?? "comentario",
-      visibility: input.visibility ?? "all",
-      content: input.content,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
+    const created = { id: memoryIds.studentComments++, schoolId: input.schoolId, studentId: input.studentId, teacherId: input.teacherId ?? null, classSubjectId: input.classSubjectId ?? null, category: input.category ?? "comentario", visibility: input.visibility ?? "all", content: input.content, createdAt: new Date(), updatedAt: new Date() };
     memory.studentComments.push(created);
     return created;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const created = await db
-    .insert(studentComments)
-    .values({
-      schoolId: input.schoolId,
-      studentId: input.studentId,
-      teacherId: input.teacherId ?? null,
-      classSubjectId: input.classSubjectId ?? null,
-      category: input.category ?? "comentario",
-      visibility: input.visibility ?? "all",
-      content: input.content,
-    })
-    .returning();
-
-  return created[0] ?? null;
+  return await supaInsert<StudentComment>("studentComments", { ...input, category: input.category ?? "comentario", visibility: input.visibility ?? "all" });
 }
 
-export async function getStudentCommentsForViewer(
-  studentId: number,
-  viewer: "student" | "guardian" | "school"
-) {
+export async function createAttendanceRecord(input: { classSessionId: number; studentId: number; status: string; reason?: string | null; recordedByTeacherId: number }) {
   if (useMemoryStore()) {
-    return memory.studentComments
-      .filter(comment => comment.studentId === studentId)
-      .map(comment => {
-        const teacher = memory.teachers.find(t => t.id === comment.teacherId);
-        return {
-          id: comment.id,
-          category: comment.category,
-          content: comment.content,
-          createdAt: comment.createdAt,
-          author: viewer === "student" ? null : (teacher?.name ?? null),
-        };
-      })
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const created = { id: memoryIds.attendanceRecords++, classSessionId: input.classSessionId, studentId: input.studentId, status: input.status, reason: input.reason ?? null, recordedByTeacherId: input.recordedByTeacherId, deletedAt: null, createdAt: new Date(), updatedAt: new Date() };
+    memory.attendanceRecords.push(created);
+    return created;
   }
+  return await supaInsert<AttendanceRecord>("attendanceRecords", { ...input });
+}
 
-  const db = await getDb();
-  if (!db) return [];
+export async function createAssessmentScore(input: { assessmentId: number; studentId: number; score: number | string; feedback?: string | null }) {
+  if (useMemoryStore()) {
+    const created = { id: memoryIds.assessmentScores++, assessmentId: input.assessmentId, studentId: input.studentId, score: typeof input.score === "string" ? parseFloat(input.score) : input.score, feedback: input.feedback ?? null, createdAt: new Date(), updatedAt: new Date() };
+    memory.assessmentScores.push(created);
+    return created;
+  }
+  return await supaInsert<AssessmentScore>("assessmentScores", { ...input, score: typeof input.score === "string" ? parseFloat(input.score) : input.score });
+}
 
-  const rows = await db
-    .select({
-      id: studentComments.id,
-      category: studentComments.category,
-      content: studentComments.content,
-      createdAt: studentComments.createdAt,
-      teacherName: teachers.name,
-    })
-    .from(studentComments)
-    .leftJoin(teachers, eq(studentComments.teacherId, teachers.id))
-    .where(eq(studentComments.studentId, studentId))
-    .orderBy(desc(studentComments.createdAt));
+export async function getAttendanceRecordsBySession(sessionId: number) {
+  if (useMemoryStore()) return memory.attendanceRecords.filter(r => r.classSessionId === sessionId);
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("attendanceRecords").select("*, students:studentId(name)").eq("classSessionId", sessionId).order("name", { referencedTable: "students", ascending: true });
+  if (!data) return [];
+  return data.map(row => {
+    const camel = row as Record<string, unknown> as AttendanceRecord;
+    const studentData = (row as Record<string, unknown>).students as Record<string, unknown>;
+    return { ...camel, studentName: studentData?.name ?? null };
+  });
+}
 
-  return rows.map(row => ({
-    id: row.id,
-    category: row.category,
-    content: row.content,
-    createdAt: row.createdAt,
-    author: viewer === "student" ? null : row.teacherName,
-  }));
+export async function getStudentCommentsForViewer(studentId: number, viewer: "student" | "guardian" | "school") {
+  if (useMemoryStore()) {
+    return memory.studentComments.filter(c => c.studentId === studentId).filter(c => {
+      if (viewer === "student") return c.visibility === "student" || c.visibility === "all";
+      if (viewer === "guardian") return c.visibility === "guardian" || c.visibility === "all";
+      return true;
+    }).map(c => {
+      const teacher = memory.teachers.find(t => t.id === c.teacherId);
+      return { id: c.id, category: c.category, content: c.content, createdAt: c.createdAt, author: viewer === "student" ? null : (teacher?.name ?? null) };
+    }).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  let visibilityFilter: string;
+  if (viewer === "student") visibilityFilter = "or(visibility.eq.student,visibility.eq.all)";
+  else if (viewer === "guardian") visibilityFilter = "or(visibility.eq.guardian,visibility.eq.all)";
+  else visibilityFilter = "";
+  let query = supabase.from("studentComments").select("id, category, content, createdAt, visibility, teachers:teacherId(name)").eq("studentId", studentId);
+  if (visibilityFilter) query = query.or(visibilityFilter);
+  const { data } = await query.order("createdAt", { ascending: false });
+  if (!data) return [];
+  return data.map(row => {
+    const r = row as Record<string, unknown>;
+    const teacherData = r.teachers as Record<string, unknown> | null;
+    return {
+      id: r.id as number,
+      category: r.category as string,
+      content: r.content as string,
+      createdAt: new Date(r.createdAt as string),
+      author: viewer === "student" ? null : (teacherData?.name as string ?? null),
+    };
+  });
 }
 
 export async function getTeacherProfile(userId: number) {
   if (useMemoryStore()) {
     const teacher = memory.teachers.find(t => t.userId === userId);
     if (!teacher) return null;
-
     const school = memory.schools.find(s => s.id === teacher.schoolId);
     const teacherClasses = await getTeacherClasses(userId);
-    const totalStudents = teacherClasses.reduce(
-      (acc, curr) => acc + curr.students,
-      0
-    );
-
-    return {
-      id: teacher.id,
-      name: teacher.name,
-      email: teacher.email,
-      subject: teacher.subject,
-      school: school?.name ?? null,
-      classes: teacherClasses,
-      students: totalStudents,
-    };
+    const totalStudents = teacherClasses.reduce((acc, curr) => acc + curr.students, 0);
+    return { id: teacher.id, name: teacher.name, email: teacher.email, subject: teacher.subject, school: school?.name ?? null, schoolId: teacher.schoolId, classes: teacherClasses, students: totalStudents };
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const result = await db
-    .select({ teacher: teachers, schoolName: schools.name })
-    .from(teachers)
-    .innerJoin(schools, eq(teachers.schoolId, schools.id))
-    .where(eq(teachers.userId, userId))
-    .limit(1);
-
-  if (!result[0]) return null;
-
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data } = await supabase.from("teachers").select("*, schools:schoolId(name)").eq("userId", userId).limit(1);
+  if (!data || data.length === 0) return null;
+  const row = data[0] as Record<string, unknown>;
+  const teacher = row as Teacher;
+  const schoolData = row.schools as Record<string, unknown>;
   const teacherClasses = await getTeacherClasses(userId);
-  const totalStudents = teacherClasses.reduce(
-    (acc, curr) => acc + curr.students,
-    0
-  );
-
-  return {
-    id: result[0].teacher.id,
-    name: result[0].teacher.name,
-    email: result[0].teacher.email,
-    subject: result[0].teacher.subject,
-    school: result[0].schoolName,
-    classes: teacherClasses,
-    students: totalStudents,
-  };
+  const totalStudents = teacherClasses.reduce((acc, curr) => acc + curr.students, 0);
+  return { id: teacher.id, name: teacher.name, email: teacher.email, subject: teacher.subject, school: schoolData?.name as string ?? null, schoolId: teacher.schoolId, classes: teacherClasses, students: totalStudents };
 }
 
 export async function getTeacherClasses(userId: number) {
   if (useMemoryStore()) {
     const teacher = memory.teachers.find(t => t.userId === userId);
     if (!teacher) return [];
-
-    const teacherClassSubjects = memory.classTeachers.filter(
-      ct => ct.teacherId === teacher.id
-    );
-
-    return teacherClassSubjects.map(ct => {
-      const classSubject = memory.classSubjects.find(
-        cs => cs.id === ct.classSubjectId
-      )!;
-      const classInfo = memory.classes.find(
-        c => c.id === classSubject.classId
-      )!;
-      const subjectInfo = memory.subjects.find(
-        s => s.id === classSubject.subjectId
-      )!;
-      const studentsCount = memory.classEnrollments.filter(
-        enrollment =>
-          enrollment.classId === classInfo.id && enrollment.status === "ativo"
-      ).length;
-
-      return {
-        id: classInfo.id,
-        name: classInfo.name,
-        subject: subjectInfo.name,
-        students: studentsCount,
-      };
+    return memory.classTeachers.filter(ct => ct.teacherId === teacher.id).map(ct => {
+      const classSubject = memory.classSubjects.find(cs => cs.id === ct.classSubjectId)!;
+      const classInfo = memory.classes.find(c => c.id === classSubject.classId)!;
+      const subjectInfo = memory.subjects.find(s => s.id === classSubject.subjectId)!;
+      const studentsCount = memory.classEnrollments.filter(e => e.classId === classInfo.id && e.status === "ativo").length;
+      return { id: classInfo.id, name: classInfo.name, subject: subjectInfo.name, students: studentsCount };
     });
   }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const teacherData = await db
-    .select({ id: teachers.id })
-    .from(teachers)
-    .where(eq(teachers.userId, userId))
-    .limit(1);
-
-  if (!teacherData[0]) return [];
-
-  const teacherId = teacherData[0].id;
-
-  const rows = await db
-    .select({
-      classId: classes.id,
-      className: classes.name,
-      subjectName: subjects.name,
-      studentsCount: sql<number>`count(${classEnrollments.id})`,
-    })
-    .from(classTeachers)
-    .innerJoin(
-      classSubjects,
-      eq(classTeachers.classSubjectId, classSubjects.id)
-    )
-    .innerJoin(classes, eq(classSubjects.classId, classes.id))
-    .innerJoin(subjects, eq(classSubjects.subjectId, subjects.id))
-    .leftJoin(
-      classEnrollments,
-      and(
-        eq(classEnrollments.classId, classes.id),
-        eq(classEnrollments.status, "ativo")
-      )
-    )
-    .where(eq(classTeachers.teacherId, teacherId))
-    .groupBy(classes.id, classes.name, subjects.name);
-
-  return rows.map(row => ({
-    id: row.classId,
-    name: row.className,
-    subject: row.subjectName,
-    students: Number(row.studentsCount ?? 0),
-  }));
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_teacher_classes", { p_user_id: userId });
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(row => row as unknown as { id: number; name: string; subject: string; students: number });
 }
 
 export async function getTeacherClassGrades(userId: number, classId: number) {
   if (useMemoryStore()) {
     const teacher = memory.teachers.find(t => t.userId === userId);
     if (!teacher) return [];
-
-    const allowedClassSubjectIds = memory.classTeachers
-      .filter(ct => ct.teacherId === teacher.id)
-      .map(ct => ct.classSubjectId);
-
-    const classSubjectIds = memory.classSubjects
-      .filter(
-        cs => cs.classId === classId && allowedClassSubjectIds.includes(cs.id)
-      )
-      .map(cs => cs.id);
-
-    if (classSubjectIds.length === 0) return [];
-
-    const assessmentIds = memory.assessments
-      .filter(a => classSubjectIds.includes(a.classSubjectId))
-      .map(a => a.id);
-
-    return memory.assessmentScores
-      .filter(score => assessmentIds.includes(score.assessmentId))
-      .map(score => {
-        const assessment = memory.assessments.find(
-          a => a.id === score.assessmentId
-        )!;
-        const student = memory.students.find(s => s.id === score.studentId)!;
-        return {
-          assessmentId: assessment.id,
-          assessmentTitle: assessment.title,
-          studentId: student.id,
-          studentName: student.name,
-          grade: Number(score.score),
-          date: assessment.assessmentDate,
-        };
-      });
+    const allowedCSIds = memory.classTeachers.filter(ct => ct.teacherId === teacher.id).map(ct => ct.classSubjectId);
+    const csIds = memory.classSubjects.filter(cs => cs.classId === classId && allowedCSIds.includes(cs.id)).map(cs => cs.id);
+    if (csIds.length === 0) return [];
+    const aIds = memory.assessments.filter(a => csIds.includes(a.classSubjectId)).map(a => a.id);
+    return memory.assessmentScores.filter(s => aIds.includes(s.assessmentId)).map(s => {
+      const a = memory.assessments.find(a2 => a2.id === s.assessmentId)!;
+      const st = memory.students.find(s2 => s2.id === s.studentId)!;
+      return { assessmentId: a.id, assessmentTitle: a.title, studentId: st.id, studentName: st.name, grade: Number(s.score), date: a.assessmentDate };
+    });
   }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const teacherData = await db
-    .select({ id: teachers.id })
-    .from(teachers)
-    .where(eq(teachers.userId, userId))
-    .limit(1);
-  if (!teacherData[0]) return [];
-
-  const teacherId = teacherData[0].id;
-
-  const rows = await db
-    .select({
-      assessmentId: assessments.id,
-      assessmentTitle: assessments.title,
-      studentId: students.id,
-      studentName: students.name,
-      grade: assessmentScores.score,
-      date: assessments.assessmentDate,
-    })
-    .from(assessmentScores)
-    .innerJoin(assessments, eq(assessmentScores.assessmentId, assessments.id))
-    .innerJoin(classSubjects, eq(assessments.classSubjectId, classSubjects.id))
-    .innerJoin(
-      classTeachers,
-      eq(classSubjects.id, classTeachers.classSubjectId)
-    )
-    .innerJoin(students, eq(assessmentScores.studentId, students.id))
-    .where(
-      and(
-        eq(classSubjects.classId, classId),
-        eq(classTeachers.teacherId, teacherId)
-      )
-    );
-
-  return rows.map(row => ({
-    ...row,
-    grade: Number(row.grade),
-  }));
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_teacher_class_grades", { p_user_id: userId, p_class_id: classId });
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(row => {
+    const camel = row as Record<string, unknown>;
+    return { ...camel, grade: Number((camel as Record<string, unknown>).grade) };
+  });
 }
 
 export async function getStudentProfile(userId: number) {
   if (useMemoryStore()) {
     const student = memory.students.find(s => s.userId === userId);
     if (!student) return null;
-
     const school = memory.schools.find(s => s.id === student.schoolId);
-    const studentGrades = memory.assessmentScores.filter(
-      score => score.studentId === student.id
-    );
-    const average =
-      studentGrades.length > 0
-        ? studentGrades.reduce((acc, item) => acc + Number(item.score), 0) /
-          studentGrades.length
-        : 0;
-
-    const absences = memory.attendanceRecords.filter(
-      attendance =>
-        attendance.studentId === student.id && attendance.status === "absent"
-    ).length;
-
-    return {
-      id: student.id,
-      name: student.name,
-      email: student.email,
-      grade: student.grade,
-      school: school?.name ?? null,
-      averageGrade: Number(average.toFixed(2)),
-      absences,
-    };
+    const scores = memory.assessmentScores.filter(s => s.studentId === student.id);
+    const average = scores.length > 0 ? scores.reduce((acc, item) => acc + Number(item.score), 0) / scores.length : 0;
+    const absences = memory.attendanceRecords.filter(a => a.studentId === student.id && a.status === "absent").length;
+    return { id: student.id, name: student.name, email: student.email, grade: student.grade, school: school?.name ?? null, schoolId: student.schoolId, averageGrade: Number(average.toFixed(2)), absences };
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const studentRows = await db
-    .select({ student: students, schoolName: schools.name })
-    .from(students)
-    .innerJoin(schools, eq(students.schoolId, schools.id))
-    .where(eq(students.userId, userId))
-    .limit(1);
-
-  if (!studentRows[0]) return null;
-
-  const student = studentRows[0].student;
-
-  const scoreRows = await db
-    .select({ score: assessmentScores.score })
-    .from(assessmentScores)
-    .where(eq(assessmentScores.studentId, student.id));
-
-  const average =
-    scoreRows.length > 0
-      ? scoreRows.reduce((acc, current) => acc + Number(current.score), 0) /
-        scoreRows.length
-      : 0;
-
-  const absentRows = await db
-    .select({ total: sql<number>`count(*)` })
-    .from(attendanceRecords)
-    .where(
-      and(
-        eq(attendanceRecords.studentId, student.id),
-        eq(attendanceRecords.status, "absent")
-      )
-    );
-
-  return {
-    id: student.id,
-    name: student.name,
-    email: student.email,
-    grade: student.grade,
-    school: studentRows[0].schoolName,
-    averageGrade: Number(average.toFixed(2)),
-    absences: Number(absentRows[0]?.total ?? 0),
-  };
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data } = await supabase.from("students").select("*, schools:schoolId(name)").eq("userId", userId).limit(1);
+  if (!data || data.length === 0) return null;
+  const row = data[0] as Record<string, unknown>;
+  const student = row as Student;
+  const schoolData = row.schools as Record<string, unknown>;
+  const { data: scoreRows } = await supabase.from("assessmentScores").select("score").eq("studentId", student.id);
+  const scores = scoreRows ?? [];
+  const average = scores.length > 0 ? scores.reduce((acc: number, r: Record<string, unknown>) => acc + Number(r.score), 0) / scores.length : 0;
+  const { count: absentCount } = await supabase.from("attendanceRecords").select("*", { count: "exact", head: true }).eq("studentId", student.id).eq("status", "absent");
+  return { id: student.id, name: student.name, email: student.email, grade: student.grade, school: schoolData?.name as string ?? null, schoolId: student.schoolId, averageGrade: Number(average.toFixed(2)), absences: absentCount ?? 0 };
 }
 
 export async function getStudentGrades(userId: number) {
   if (useMemoryStore()) {
     const student = memory.students.find(s => s.userId === userId);
     if (!student) return [];
-
-    return memory.assessmentScores
-      .filter(score => score.studentId === student.id)
-      .map(score => {
-        const assessment = memory.assessments.find(
-          a => a.id === score.assessmentId
-        )!;
-        const classSubject = memory.classSubjects.find(
-          cs => cs.id === assessment.classSubjectId
-        )!;
-        const subject = memory.subjects.find(
-          s => s.id === classSubject.subjectId
-        )!;
-
-        return {
-          subject: subject.name,
-          grade: Number(score.score),
-          date: assessment.assessmentDate,
-        };
-      })
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    return memory.assessmentScores.filter(s => s.studentId === student.id).map(s => {
+      const a = memory.assessments.find(a2 => a2.id === s.assessmentId)!;
+      const cs = memory.classSubjects.find(c => c.id === a.classSubjectId)!;
+      const subj = memory.subjects.find(s2 => s2.id === cs.subjectId)!;
+      return { subject: subj.name, grade: Number(s.score), date: a.assessmentDate };
+    }).sort((a, b) => (a.date < b.date ? 1 : -1));
   }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const studentRows = await db
-    .select({ id: students.id })
-    .from(students)
-    .where(eq(students.userId, userId))
-    .limit(1);
-  if (!studentRows[0]) return [];
-
-  const studentId = studentRows[0].id;
-
-  const rows = await db
-    .select({
-      subject: subjects.name,
-      grade: assessmentScores.score,
-      date: assessments.assessmentDate,
-    })
-    .from(assessmentScores)
-    .innerJoin(assessments, eq(assessmentScores.assessmentId, assessments.id))
-    .innerJoin(classSubjects, eq(assessments.classSubjectId, classSubjects.id))
-    .innerJoin(subjects, eq(classSubjects.subjectId, subjects.id))
-    .where(eq(assessmentScores.studentId, studentId))
-    .orderBy(desc(assessments.assessmentDate));
-
-  return rows.map(row => ({
-    subject: row.subject,
-    grade: Number(row.grade),
-    date: row.date,
-  }));
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_student_grades", { p_user_id: userId });
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(row => {
+    const camel = row as Record<string, unknown>;
+    return { ...camel, grade: Number((camel as Record<string, unknown>).grade) };
+  });
 }
 
 export async function getStudentCommunications(userId: number) {
   if (useMemoryStore()) {
     const student = memory.students.find(s => s.userId === userId);
     if (!student) return [];
-
-    const directIds = memory.communicationRecipients
-      .filter(
-        r => r.recipientType === "student" && r.recipientRefId === student.id
-      )
-      .map(r => r.communicationId);
-
-    const schoolCommunications = memory.communications
-      .filter(c => c.schoolId === student.schoolId)
-      .map(c => c.id);
-
-    const communicationIds = Array.from(
-      new Set([...directIds, ...schoolCommunications])
-    );
-
-    return memory.communications
-      .filter(c => communicationIds.includes(c.id))
-      .map(c => ({
-        id: c.id,
-        title: c.title,
-        body: c.body,
-        type: c.communicationType,
-        createdAt: c.createdAt,
-      }))
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const directIds = memory.communicationRecipients.filter(r => r.recipientType === "student" && r.recipientRefId === student.id).map(r => r.communicationId);
+    const schoolComms = memory.communications.filter(c => c.schoolId === student.schoolId).map(c => c.id);
+    const ids = Array.from(new Set([...directIds, ...schoolComms]));
+    return memory.communications.filter(c => ids.includes(c.id)).map(c => ({ id: c.id, title: c.title, body: c.body, type: c.communicationType, createdAt: c.createdAt })).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const studentRows = await db
-    .select({ id: students.id, schoolId: students.schoolId })
-    .from(students)
-    .where(eq(students.userId, userId))
-    .limit(1);
-
-  if (!studentRows[0]) return [];
-
-  const studentId = studentRows[0].id;
-  const schoolId = studentRows[0].schoolId;
-
-  const direct = await db
-    .select({
-      id: communications.id,
-      title: communications.title,
-      body: communications.body,
-      type: communications.communicationType,
-      createdAt: communications.createdAt,
-    })
-    .from(communicationRecipients)
-    .innerJoin(
-      communications,
-      eq(communicationRecipients.communicationId, communications.id)
-    )
-    .where(
-      and(
-        eq(communicationRecipients.recipientType, "student"),
-        eq(communicationRecipients.recipientRefId, studentId)
-      )
-    );
-
-  const broad = await db
-    .select({
-      id: communications.id,
-      title: communications.title,
-      body: communications.body,
-      type: communications.communicationType,
-      createdAt: communications.createdAt,
-    })
-    .from(communications)
-    .where(eq(communications.schoolId, schoolId));
-
-  const map = new Map<number, (typeof direct)[number]>();
-  [...direct, ...broad].forEach(entry => {
-    map.set(entry.id, entry);
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_student_communications", { p_user_id: userId });
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(row => {
+    const camel = row as Record<string, unknown>;
+    return { ...camel, type: (camel as Record<string, unknown>).type };
   });
-
-  return Array.from(map.values()).sort((a, b) =>
-    a.createdAt < b.createdAt ? 1 : -1
-  );
 }
 
 export async function getGuardianProfile(userId: number) {
   if (useMemoryStore()) {
     const guardian = memory.guardians.find(g => g.userId === userId);
     if (!guardian) return null;
-
-    return {
-      id: guardian.id,
-      name: guardian.name,
-      email: guardian.email,
-      relationship: guardian.relationship,
-      students: await getGuardianStudents(userId),
-    };
+    return { id: guardian.id, name: guardian.name, email: guardian.email, relationship: guardian.relationship, students: await getGuardianStudents(userId) };
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const rows = await db
-    .select()
-    .from(guardians)
-    .where(eq(guardians.userId, userId))
-    .limit(1);
-
-  if (!rows[0]) return null;
-
-  return {
-    id: rows[0].id,
-    name: rows[0].name,
-    email: rows[0].email,
-    relationship: rows[0].relationship,
-    students: await getGuardianStudents(userId),
-  };
+  const result = await supaSelectOne<Guardian>("guardians", { userId });
+  if (!result) return null;
+  return { id: result.id, name: result.name, email: result.email, relationship: result.relationship, students: await getGuardianStudents(userId) };
 }
 
 export async function getGuardianStudents(userId: number) {
   if (useMemoryStore()) {
     const guardian = memory.guardians.find(g => g.userId === userId);
     if (!guardian) return [];
-
-    const links = memory.studentGuardians.filter(
-      sg => sg.guardianId === guardian.id
-    );
-
-    return links
-      .map(link => {
-        const student = memory.students.find(s => s.id === link.studentId);
-        if (!student) return null;
-
-        const scores = memory.assessmentScores.filter(
-          score => score.studentId === student.id
-        );
-        const average =
-          scores.length > 0
-            ? scores.reduce((acc, item) => acc + Number(item.score), 0) /
-              scores.length
-            : 0;
-
-        return {
-          id: student.id,
-          name: student.name,
-          grade: student.grade,
-          averageGrade: Number(average.toFixed(2)),
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    return memory.studentGuardians.filter(sg => sg.guardianId === guardian.id).map(link => {
+      const student = memory.students.find(s => s.id === link.studentId);
+      if (!student) return null;
+      const scores = memory.assessmentScores.filter(s => s.studentId === student.id);
+      const avg = scores.length > 0 ? scores.reduce((a, i) => a + Number(i.score), 0) / scores.length : 0;
+      return { id: student.id, name: student.name, grade: student.grade, averageGrade: Number(avg.toFixed(2)) };
+    }).filter(Boolean) as Array<{ id: number; name: string; grade: string | null; averageGrade: number }>;
   }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const guardianRows = await db
-    .select({ id: guardians.id })
-    .from(guardians)
-    .where(eq(guardians.userId, userId))
-    .limit(1);
-
-  if (!guardianRows[0]) return [];
-
-  const guardianId = guardianRows[0].id;
-
-  const links = await db
-    .select({ studentId: studentGuardians.studentId })
-    .from(studentGuardians)
-    .where(eq(studentGuardians.guardianId, guardianId));
-
-  if (links.length === 0) return [];
-
-  const studentIds = links.map(link => link.studentId);
-
-  const rows = await db
-    .select({
-      id: students.id,
-      name: students.name,
-      grade: students.grade,
-    })
-    .from(students)
-    .where(inArray(students.id, studentIds));
-
-  const scoreRows = await db
-    .select({
-      studentId: assessmentScores.studentId,
-      score: assessmentScores.score,
-    })
-    .from(assessmentScores)
-    .where(inArray(assessmentScores.studentId, studentIds));
-
-  const grouped = new Map<number, number[]>();
-  scoreRows.forEach(row => {
-    const existing = grouped.get(row.studentId) ?? [];
-    existing.push(Number(row.score));
-    grouped.set(row.studentId, existing);
-  });
-
-  return rows.map(row => {
-    const scores = grouped.get(row.id) ?? [];
-    const average =
-      scores.length > 0
-        ? scores.reduce((acc, score) => acc + score, 0) / scores.length
-        : 0;
-
-    return {
-      id: row.id,
-      name: row.name,
-      grade: row.grade,
-      averageGrade: Number(average.toFixed(2)),
-    };
-  });
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_guardian_students", { p_user_id: userId });
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(row => row as unknown as { id: number; name: string; grade: string | null; averageGrade: number });
 }
 
-export async function getGuardianStudentPerformance(
-  userId: number,
-  studentId: number
-) {
+export async function getGuardianStudentPerformance(userId: number, studentId: number) {
   if (useMemoryStore()) {
     const guardian = memory.guardians.find(g => g.userId === userId);
     if (!guardian) return null;
-
-    const hasLink = memory.studentGuardians.some(
-      sg => sg.guardianId === guardian.id && sg.studentId === studentId
-    );
-    if (!hasLink) return null;
-
+    if (!memory.studentGuardians.some(sg => sg.guardianId === guardian.id && sg.studentId === studentId)) return null;
     const grades = await getStudentGradesForStudentId(studentId);
-    const absences = memory.attendanceRecords.filter(
-      ar => ar.studentId === studentId && ar.status === "absent"
-    ).length;
-
-    const alerts = memory.studentComments
-      .filter(
-        comment =>
-          comment.studentId === studentId &&
-          (comment.category === "ocorrencia" || comment.category === "melhoria")
-      )
-      .map(comment => {
-        const teacherName = memory.teachers.find(
-          t => t.id === comment.teacherId
-        )?.name;
-        return teacherName
-          ? `${comment.category.toUpperCase()}: ${comment.content} (${teacherName})`
-          : `${comment.category.toUpperCase()}: ${comment.content}`;
-      });
-
-    return {
-      studentId,
-      grades,
-      absences,
-      alerts,
-    };
+    const absences = memory.attendanceRecords.filter(ar => ar.studentId === studentId && ar.status === "absent").length;
+    const alerts = memory.studentComments.filter(c => c.studentId === studentId && (c.category === "ocorrencia" || c.category === "melhoria")).map(c => {
+      const tName = memory.teachers.find(t => t.id === c.teacherId)?.name;
+      return tName ? `${c.category.toUpperCase()}: ${c.content} (${tName})` : `${c.category.toUpperCase()}: ${c.content}`;
+    });
+    return { studentId, grades, absences, alerts };
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const guardianRows = await db
-    .select({ id: guardians.id })
-    .from(guardians)
-    .where(eq(guardians.userId, userId))
-    .limit(1);
-
-  if (!guardianRows[0]) return null;
-
-  const guardianId = guardianRows[0].id;
-
-  const link = await db
-    .select({ id: studentGuardians.id })
-    .from(studentGuardians)
-    .where(
-      and(
-        eq(studentGuardians.guardianId, guardianId),
-        eq(studentGuardians.studentId, studentId)
-      )
-    )
-    .limit(1);
-
-  if (!link[0]) return null;
-
-  const grades = await getStudentGradesForStudentId(studentId);
-
-  const absentRows = await db
-    .select({ total: sql<number>`count(*)` })
-    .from(attendanceRecords)
-    .where(
-      and(
-        eq(attendanceRecords.studentId, studentId),
-        eq(attendanceRecords.status, "absent")
-      )
-    );
-
-  const commentRows = await db
-    .select({
-      category: studentComments.category,
-      content: studentComments.content,
-      teacherName: teachers.name,
-    })
-    .from(studentComments)
-    .leftJoin(teachers, eq(studentComments.teacherId, teachers.id))
-    .where(
-      and(
-        eq(studentComments.studentId, studentId),
-        inArray(studentComments.category, ["ocorrencia", "melhoria"])
-      )
-    )
-    .orderBy(desc(studentComments.createdAt));
-
-  const alerts = commentRows.map(row =>
-    row.teacherName
-      ? `${row.category.toUpperCase()}: ${row.content} (${row.teacherName})`
-      : `${row.category.toUpperCase()}: ${row.content}`
-  );
-
-  return {
-    studentId,
-    grades,
-    absences: Number(absentRows[0]?.total ?? 0),
-    alerts,
-  };
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("get_guardian_student_performance", { p_user_id: userId, p_student_id: studentId });
+  if (error || !data) return null;
+  const result = data as Record<string, unknown>;
+  return result as unknown as { studentId: number; grades: Array<{ subject: string; grade: number; date: string }>; absences: number; alerts: string[] };
 }
 
 async function getStudentGradesForStudentId(studentId: number) {
   if (useMemoryStore()) {
-    return memory.assessmentScores
-      .filter(score => score.studentId === studentId)
-      .map(score => {
-        const assessment = memory.assessments.find(
-          a => a.id === score.assessmentId
-        )!;
-        const classSubject = memory.classSubjects.find(
-          cs => cs.id === assessment.classSubjectId
-        )!;
-        const subject = memory.subjects.find(
-          s => s.id === classSubject.subjectId
-        )!;
-
-        return {
-          subject: subject.name,
-          grade: Number(score.score),
-          date: assessment.assessmentDate,
-        };
-      })
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    return memory.assessmentScores.filter(s => s.studentId === studentId).map(s => {
+      const a = memory.assessments.find(a2 => a2.id === s.assessmentId)!;
+      const cs = memory.classSubjects.find(c => c.id === a.classSubjectId)!;
+      const subj = memory.subjects.find(s2 => s2.id === cs.subjectId)!;
+      return { subject: subj.name, grade: Number(s.score), date: a.assessmentDate };
+    }).sort((a, b) => (a.date < b.date ? 1 : -1));
   }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const rows = await db
-    .select({
-      subject: subjects.name,
-      grade: assessmentScores.score,
-      date: assessments.assessmentDate,
-    })
-    .from(assessmentScores)
-    .innerJoin(assessments, eq(assessmentScores.assessmentId, assessments.id))
-    .innerJoin(classSubjects, eq(assessments.classSubjectId, classSubjects.id))
-    .innerJoin(subjects, eq(classSubjects.subjectId, subjects.id))
-    .where(eq(assessmentScores.studentId, studentId))
-    .orderBy(desc(assessments.assessmentDate));
-
-  return rows.map(row => ({
-    subject: row.subject,
-    grade: Number(row.grade),
-    date: row.date,
-  }));
-}
-
-const entityTableMap = {
-  users,
-  schools,
-  schoolYears,
-  userSchools,
-  schoolStaffProfiles,
-  teachers,
-  students,
-  guardians,
-  studentGuardians,
-  contacts,
-  subjects,
-  classes,
-  classSubjects,
-  classTeachers,
-  classEnrollments,
-  classSessions,
-  attendanceRecords,
-  assessments,
-  assessmentScores,
-  studentComments,
-  schoolEvents,
-  eventTargets,
-  communications,
-  communicationRecipients,
-  notifications,
-  attachments,
-} as const;
-
-export type RegistryEntityName = keyof typeof entityTableMap;
-
-type RegistryFilterValue =
-  | string
-  | number
-  | boolean
-  | Date
-  | null
-  | Array<string | number | boolean>;
-
-type RegistryFilters = Record<string, RegistryFilterValue | undefined>;
-
-type RegistryListParams = {
-  limit?: number;
-  offset?: number;
-  filters?: RegistryFilters;
-  orderBy?: string;
-  orderDirection?: "asc" | "desc";
-};
-
-function toInt(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.trunc(value);
-  }
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return Math.trunc(parsed);
-  }
-  return null;
-}
-
-function getMemoryStoreByEntity(
-  entity: RegistryEntityName
-): Array<Record<string, unknown>> {
-  switch (entity) {
-    case "users":
-      return memory.users as Array<Record<string, unknown>>;
-    case "schools":
-      return memory.schools as Array<Record<string, unknown>>;
-    case "schoolYears":
-      return memory.schoolYears as Array<Record<string, unknown>>;
-    case "userSchools":
-      return memory.userSchools as Array<Record<string, unknown>>;
-    case "schoolStaffProfiles":
-      return memory.schoolStaffProfiles as Array<Record<string, unknown>>;
-    case "teachers":
-      return memory.teachers as Array<Record<string, unknown>>;
-    case "students":
-      return memory.students as Array<Record<string, unknown>>;
-    case "guardians":
-      return memory.guardians as Array<Record<string, unknown>>;
-    case "studentGuardians":
-      return memory.studentGuardians as Array<Record<string, unknown>>;
-    case "contacts":
-      return memory.contacts as Array<Record<string, unknown>>;
-    case "subjects":
-      return memory.subjects as Array<Record<string, unknown>>;
-    case "classes":
-      return memory.classes as Array<Record<string, unknown>>;
-    case "classSubjects":
-      return memory.classSubjects as Array<Record<string, unknown>>;
-    case "classTeachers":
-      return memory.classTeachers as Array<Record<string, unknown>>;
-    case "classEnrollments":
-      return memory.classEnrollments as Array<Record<string, unknown>>;
-    case "classSessions":
-      return memory.classSessions as Array<Record<string, unknown>>;
-    case "attendanceRecords":
-      return memory.attendanceRecords as Array<Record<string, unknown>>;
-    case "assessments":
-      return memory.assessments as Array<Record<string, unknown>>;
-    case "assessmentScores":
-      return memory.assessmentScores as Array<Record<string, unknown>>;
-    case "studentComments":
-      return memory.studentComments as Array<Record<string, unknown>>;
-    case "schoolEvents":
-      return memory.schoolEvents as Array<Record<string, unknown>>;
-    case "eventTargets":
-      return memory.eventTargets as Array<Record<string, unknown>>;
-    case "communications":
-      return memory.communications as Array<Record<string, unknown>>;
-    case "communicationRecipients":
-      return memory.communicationRecipients as Array<Record<string, unknown>>;
-    case "notifications":
-      return memory.notifications as Array<Record<string, unknown>>;
-    case "attachments":
-      return memory.attachments as Array<Record<string, unknown>>;
-    default: {
-      const exhaustive: never = entity;
-      throw new Error(`Unsupported entity: ${String(exhaustive)}`);
-    }
-  }
-}
-
-function hasColumn(entity: RegistryEntityName, column: string) {
-  const columns = getTableColumns(entityTableMap[entity]);
-  return Object.prototype.hasOwnProperty.call(columns, column);
-}
-
-function sanitizeEntityPayload(
-  entity: RegistryEntityName,
-  payload: Record<string, unknown>,
-  options: { isUpdate: boolean }
-) {
-  const columns = getTableColumns(entityTableMap[entity]);
-  const allowed = new Set(Object.keys(columns));
-  const sanitized: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(payload)) {
-    if (!allowed.has(key)) continue;
-    if (options.isUpdate && key === "id") continue;
-    sanitized[key] = value;
-  }
-
-  return sanitized;
-}
-
-function applyMemoryEntityDefaults(
-  entity: RegistryEntityName,
-  row: Record<string, unknown>
-) {
-  const withDefault = <T>(key: string, value: T) => {
-    if (row[key] === undefined) {
-      row[key] = value;
-    }
-  };
-
-  switch (entity) {
-    case "users":
-      withDefault("role", "user");
-      break;
-    case "schools":
-      withDefault("status", "trial");
-      break;
-    case "schoolYears":
-      withDefault("isCurrent", 0);
-      break;
-    case "userSchools":
-      withDefault("role", "coordinator");
-      break;
-    case "teachers":
-      withDefault("active", 1);
-      break;
-    case "students":
-      withDefault("status", "ativo");
-      break;
-    case "studentGuardians":
-      withDefault("isPrimary", 0);
-      break;
-    case "contacts":
-      withDefault("status", "novo");
-      break;
-    case "classes":
-      withDefault("shift", "morning");
-      withDefault("status", "ativo");
-      break;
-    case "classEnrollments":
-      withDefault("status", "ativo");
-      break;
-    case "classSessions":
-      withDefault("lessonNumber", 1);
-      break;
-    case "attendanceRecords":
-      withDefault("status", "present");
-      break;
-    case "assessments":
-      withDefault("maxScore", "10.00");
-      withDefault("weight", "1.00");
-      break;
-    case "studentComments":
-      withDefault("category", "comentario");
-      withDefault("visibility", "all");
-      break;
-    case "schoolEvents":
-      withDefault("eventType", "evento_escolar");
-      break;
-    case "communications":
-      withDefault("communicationType", "announcement");
-      break;
-    case "notifications":
-      withDefault("notificationType", "general");
-      withDefault("isRead", 0);
-      break;
-    default:
-      break;
-  }
-}
-
-function rowMatchesFilters(
-  row: Record<string, unknown>,
-  filters: RegistryFilters | undefined
-) {
-  if (!filters) return true;
-
-  return Object.entries(filters).every(([key, value]) => {
-    if (value === undefined) return true;
-    const rowValue = row[key];
-
-    if (Array.isArray(value)) {
-      return value.includes(rowValue as string | number | boolean);
-    }
-
-    return rowValue === value;
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("assessmentScores").select("score, assessments:assessmentId(assessmentDate, classSubjects:classSubjectId(subjects:subjectId(name)))").eq("studentId", studentId).order("assessmentDate", { referencedTable: "assessments", ascending: false });
+  if (!data) return [];
+  return (data as Record<string, unknown>[]).map(row => {
+    const r = row as Record<string, unknown>;
+    const a = r.assessments as Record<string, unknown>;
+    const cs = a?.classSubjects as Record<string, unknown>;
+    const subj = cs?.subjects as Record<string, unknown>;
+    return { subject: subj?.name as string ?? "", grade: Number(r.score), date: a?.assessmentDate as string ?? "" };
   });
 }
 
-export async function listEntityRows(
-  entity: RegistryEntityName,
-  params: RegistryListParams = {}
-) {
+// ── Registry CRUD (generic) ────────────────────────────────────
+
+type RegistryFilterValue = string | number | boolean | Date | null | Array<string | number | boolean>;
+type RegistryFilters = Record<string, RegistryFilterValue | undefined>;
+type RegistryListParams = { limit?: number; offset?: number; filters?: RegistryFilters; orderBy?: string; orderDirection?: "asc" | "desc"; includeDeleted?: boolean };
+
+export async function listEntityRows(entity: RegistryEntityName, params: RegistryListParams = {}) {
   const limit = Math.max(1, Math.min(500, params.limit ?? 100));
   const offset = Math.max(0, params.offset ?? 0);
   const orderDirection = params.orderDirection ?? "desc";
 
   if (useMemoryStore()) {
-    const rows = getMemoryStoreByEntity(entity)
-      .filter(row => rowMatchesFilters(row, params.filters))
-      .slice();
-
-    const orderBy =
-      params.orderBy && hasColumn(entity, params.orderBy)
-        ? params.orderBy
-        : hasColumn(entity, "createdAt")
-          ? "createdAt"
-          : "id";
-
+    let rows = getMemoryStoreByEntity(entity).filter(row => rowMatchesFilters(row, params.filters)).slice();
+    if (!params.includeDeleted && entitySupportsSoftDelete(entity)) rows = rows.filter(row => !(row as Record<string, unknown>).deletedAt);
+    const orderBy = params.orderBy && hasColumn(entity, params.orderBy) ? params.orderBy : hasColumn(entity, "createdAt") ? "createdAt" : "id";
     rows.sort((a, b) => {
-      const aValue = a[orderBy];
-      const bValue = b[orderBy];
-
-      if (aValue === bValue) return 0;
-      if (aValue == null) return 1;
-      if (bValue == null) return -1;
-
-      if (aValue instanceof Date && bValue instanceof Date) {
-        return orderDirection === "asc"
-          ? aValue.getTime() - bValue.getTime()
-          : bValue.getTime() - aValue.getTime();
-      }
-
-      return orderDirection === "asc"
-        ? String(aValue).localeCompare(String(bValue))
-        : String(bValue).localeCompare(String(aValue));
+      const aVal = a[orderBy]; const bVal = b[orderBy];
+      if (aVal === bVal) return 0; if (aVal == null) return 1; if (bVal == null) return -1;
+      if (aVal instanceof Date && bVal instanceof Date) return orderDirection === "asc" ? aVal.getTime() - bVal.getTime() : bVal.getTime() - aVal.getTime();
+      return orderDirection === "asc" ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
     });
-
     return rows.slice(offset, offset + limit);
   }
 
-  const db = await getDb();
-  if (!db) return [];
-
-  const table = entityTableMap[entity] as any;
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const table = entityTableName[entity];
   const filters = params.filters ?? {};
-  const conditions: any[] = [];
+
+  let query = supabase.from(table).select("*");
 
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined) continue;
-    const column = table[key];
-    if (!column) continue;
-
-    if (value === null) {
-      conditions.push(isNull(column));
-      continue;
-    }
-
-    if (Array.isArray(value)) {
-      conditions.push(
-        inArray(column, value as Array<string | number | boolean>)
-      );
-      continue;
-    }
-
-    conditions.push(eq(column, value as any));
+    if (value === null) { query = query.is(key, null); continue; }
+    if (value === "not_null") { query = query.not(key, "is", null); continue; }
+    if (Array.isArray(value)) { query = query.in(key, value as Array<string | number | boolean>); continue; }
+    query = query.eq(key, value as string | number | boolean);
   }
 
-  let query = db.select().from(table) as any;
-
-  if (conditions.length === 1) {
-    query = query.where(conditions[0]);
+  if (!params.includeDeleted && entitySupportsSoftDelete(entity)) {
+    query = query.is("deletedAt", null);
   }
 
-  if (conditions.length > 1) {
-    query = query.where(and(...conditions));
-  }
+  const orderByCol = params.orderBy && hasColumn(entity, params.orderBy) ? params.orderBy : hasColumn(entity, "createdAt") ? "createdAt" : "id";
+  const finalOrderCol = hasColumn(entity, orderByCol) ? orderByCol : "id";
 
-  const orderBy =
-    params.orderBy && table[params.orderBy]
-      ? table[params.orderBy]
-      : table.createdAt
-        ? table.createdAt
-        : table.id;
+  query = query.order(finalOrderCol, { ascending: orderDirection === "asc" });
+  query = query.range(offset, offset + limit - 1);
 
-  query = query.orderBy(
-    orderDirection === "asc" ? asc(orderBy) : desc(orderBy)
-  );
-
-  return await query.limit(limit).offset(offset);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data as Record<string, unknown>[];
 }
 
 export async function getEntityById(entity: RegistryEntityName, id: number) {
-  if (useMemoryStore()) {
-    return (
-      getMemoryStoreByEntity(entity).find(row => toInt(row.id) === id) ?? null
-    );
-  }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const table = entityTableMap[entity] as any;
-  const rows = await db.select().from(table).where(eq(table.id, id)).limit(1);
-  return rows[0] ?? null;
+  if (useMemoryStore()) return getMemoryStoreByEntity(entity).find(row => toInt(row.id) === id) ?? null;
+  const table = entityTableName[entity];
+  return await supaSelectOne<Record<string, unknown>>(table, { id });
 }
 
-export async function createEntityRow(
-  entity: RegistryEntityName,
-  payload: Record<string, unknown>
-) {
+export async function createEntityRow(entity: RegistryEntityName, payload: Record<string, unknown>) {
   const data = sanitizeEntityPayload(entity, payload, { isUpdate: false });
-
-  if (Object.keys(data).length === 0) {
-    throw new Error("No valid fields to create entity");
-  }
-
-  const now = new Date();
-
+  if (Object.keys(data).length === 0) throw new Error("No valid fields to create entity");
   if (useMemoryStore()) {
     const target = getMemoryStoreByEntity(entity);
-    const row: Record<string, unknown> = { ...data };
-
+    const row: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (entityColumns[entity]?.has(key)) row[key] = value;
+    }
     applyMemoryEntityDefaults(entity, row);
-
-    if (hasColumn(entity, "id") && (row.id === undefined || row.id === null)) {
-      row.id = (memoryIds as Record<string, number>)[entity]++;
-    }
-
-    if (hasColumn(entity, "createdAt") && row.createdAt === undefined) {
-      row.createdAt = now;
-    }
-
-    if (hasColumn(entity, "updatedAt") && row.updatedAt === undefined) {
-      row.updatedAt = now;
-    }
-
+    if (hasColumn(entity, "id") && (row.id === undefined || row.id === null)) row.id = (memoryIds as Record<string, number>)[entity]++;
+    if (hasColumn(entity, "createdAt") && row.createdAt === undefined) row.createdAt = new Date();
+    if (hasColumn(entity, "updatedAt") && row.updatedAt === undefined) row.updatedAt = new Date();
     target.push(row);
     return row;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const table = entityTableMap[entity] as any;
-
-  if (table.updatedAt && data.updatedAt === undefined) {
-    data.updatedAt = now;
-  }
-
-  const created = await db
-    .insert(table)
-    .values(data as any)
-    .returning();
-  return created[0] ?? null;
+  const table = entityTableName[entity];
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const now = new Date().toISOString();
+  if (entityColumns[entity]?.has("updatedAt") && !data.updatedAt) data.updatedAt = now;
+  const { data: created, error } = await supabase.from(table).insert(data).select();
+  if (error || !created || created.length === 0) return null;
+  return created[0] as Record<string, unknown>;
 }
 
-export async function updateEntityRow(
-  entity: RegistryEntityName,
-  id: number,
-  payload: Record<string, unknown>
-) {
+export async function updateEntityRow(entity: RegistryEntityName, id: number, payload: Record<string, unknown>) {
   const data = sanitizeEntityPayload(entity, payload, { isUpdate: true });
-
-  if (Object.keys(data).length === 0) {
-    return await getEntityById(entity, id);
-  }
-
+  if (Object.keys(data).length === 0) return await getEntityById(entity, id);
   if (useMemoryStore()) {
     const target = getMemoryStoreByEntity(entity);
     const index = target.findIndex(row => toInt(row.id) === id);
     if (index < 0) return null;
-
-    const next = {
-      ...target[index],
-      ...data,
-      ...(hasColumn(entity, "updatedAt") ? { updatedAt: new Date() } : {}),
-    };
-
+    const next = { ...target[index], ...payload, ...(hasColumn(entity, "updatedAt") ? { updatedAt: new Date() } : {}) };
     target[index] = next;
     return next;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const table = entityTableMap[entity] as any;
-  const setPayload = {
-    ...data,
-    ...(table.updatedAt && data.updatedAt === undefined
-      ? { updatedAt: new Date() }
-      : {}),
-  };
-
-  const updated = await db
-    .update(table)
-    .set(setPayload as any)
-    .where(eq(table.id, id))
-    .returning();
-
-  return updated[0] ?? null;
+  const table = entityTableName[entity];
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  if (entityColumns[entity]?.has("updatedAt") && !data.updatedAt) data.updatedAt = new Date().toISOString();
+  const { data: updated, error } = await supabase.from(table).update(data).eq("id", id).select();
+  if (error || !updated || updated.length === 0) return null;
+  return updated[0] as Record<string, unknown>;
 }
 
-export async function deleteEntityRow(entity: RegistryEntityName, id: number) {
+const SOFT_DELETE_ENTITIES: Set<RegistryEntityName> = new Set([
+  "students", "teachers", "guardians", "classes", "classEnrollments",
+  "attendanceRecords", "assessments", "assessmentScores", "studentComments",
+  "schoolEvents", "communications", "notifications",
+]);
+
+export function entitySupportsSoftDelete(entity: RegistryEntityName): boolean {
+  return SOFT_DELETE_ENTITIES.has(entity);
+}
+
+export async function deleteEntityRow(entity: RegistryEntityName, id: number, permanent: boolean = false) {
+  if (!permanent && entitySupportsSoftDelete(entity)) return await updateEntityRow(entity, id, { deletedAt: new Date().toISOString() });
   if (useMemoryStore()) {
     const target = getMemoryStoreByEntity(entity);
     const index = target.findIndex(row => toInt(row.id) === id);
@@ -2355,277 +1446,323 @@ export async function deleteEntityRow(entity: RegistryEntityName, id: number) {
     const [removed] = target.splice(index, 1);
     return removed ?? null;
   }
-
-  const db = await getDb();
-  if (!db) return null;
-
-  const table = entityTableMap[entity] as any;
-  const deleted = await db.delete(table).where(eq(table.id, id)).returning();
-  return deleted[0] ?? null;
+  const table = entityTableName[entity];
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data: deleted, error } = await supabase.from(table).delete().eq("id", id).select();
+  if (error || !deleted || deleted.length === 0) return null;
+  return deleted[0] as Record<string, unknown>;
 }
 
-export async function getUserManagedSchoolIds(
-  userId: number
-): Promise<number[]> {
-  if (useMemoryStore()) {
-    return Array.from(
-      new Set(
-        memory.userSchools
-          .filter(link => link.userId === userId)
-          .map(link => link.schoolId)
-      )
-    );
-  }
-
-  const db = await getDb();
-  if (!db) return [];
-
-  const rows = await db
-    .select({ schoolId: userSchools.schoolId })
-    .from(userSchools)
-    .where(eq(userSchools.userId, userId));
-
-  return Array.from(new Set(rows.map(row => row.schoolId)));
+export async function restoreEntityRow(entity: RegistryEntityName, id: number) {
+  if (!entitySupportsSoftDelete(entity)) throw new Error(`Entity ${entity} does not support soft-delete/restore`);
+  return await updateEntityRow(entity, id, { deletedAt: null });
 }
 
-export async function userHasSchoolAccess(
-  userId: number,
-  schoolId: number
-): Promise<boolean> {
+export async function listDeletedEntityRows(entity: RegistryEntityName, params: Omit<RegistryListParams, "includeDeleted"> = {}) {
+  return await listEntityRows(entity, { ...params, includeDeleted: true, filters: { ...(params.filters ?? {}), deletedAt: "not_null" as any } });
+}
+
+export async function getUserManagedSchoolIds(userId: number): Promise<number[]> {
+  if (useMemoryStore()) return Array.from(new Set(memory.userSchools.filter(link => link.userId === userId).map(link => link.schoolId)));
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("userSchools").select("schoolId").eq("userId", userId);
+  if (!data) return [];
+  return Array.from(new Set(data.map(row => row.schoolId)));
+}
+
+export async function userHasSchoolAccess(userId: number, schoolId: number): Promise<boolean> {
   const schoolIds = await getUserManagedSchoolIds(userId);
   return schoolIds.includes(schoolId);
 }
 
-export async function resolveEntitySchoolId(
-  entity: RegistryEntityName,
-  row: Record<string, unknown> | null
-): Promise<number | null> {
+export async function resolveEntitySchoolId(entity: RegistryEntityName, row: Record<string, unknown> | null): Promise<number | null> {
   if (!row) return null;
-
   switch (entity) {
-    case "schools":
-      return toInt(row.id);
-    case "schoolYears":
-    case "userSchools":
-    case "schoolStaffProfiles":
-    case "teachers":
-    case "students":
-    case "guardians":
-    case "subjects":
-    case "classes":
-    case "studentComments":
-    case "schoolEvents":
-    case "communications":
-      return toInt(row.schoolId);
-    case "contacts":
-      return toInt(row.schoolId);
-    case "studentGuardians": {
-      const studentId = toInt(row.studentId);
-      if (!studentId) return null;
-      const student = (await getEntityById("students", studentId)) as Record<
-        string,
-        unknown
-      > | null;
-      return toInt(student?.schoolId);
-    }
-    case "classSubjects": {
-      const classId = toInt(row.classId);
-      if (!classId) return null;
-      const classRow = (await getEntityById("classes", classId)) as Record<
-        string,
-        unknown
-      > | null;
-      return toInt(classRow?.schoolId);
-    }
-    case "classTeachers": {
-      const classSubjectId = toInt(row.classSubjectId);
-      if (!classSubjectId) return null;
-      const classSubject = (await getEntityById(
-        "classSubjects",
-        classSubjectId
-      )) as Record<string, unknown> | null;
-      return await resolveEntitySchoolId("classSubjects", classSubject);
-    }
-    case "classEnrollments": {
-      const classId = toInt(row.classId);
-      if (!classId) return null;
-      const classRow = (await getEntityById("classes", classId)) as Record<
-        string,
-        unknown
-      > | null;
-      return toInt(classRow?.schoolId);
-    }
-    case "classSessions": {
-      const classSubjectId = toInt(row.classSubjectId);
-      if (!classSubjectId) return null;
-      const classSubject = (await getEntityById(
-        "classSubjects",
-        classSubjectId
-      )) as Record<string, unknown> | null;
-      return await resolveEntitySchoolId("classSubjects", classSubject);
-    }
-    case "attendanceRecords": {
-      const classSessionId = toInt(row.classSessionId);
-      if (!classSessionId) return null;
-      const classSessionRow = (await getEntityById(
-        "classSessions",
-        classSessionId
-      )) as Record<string, unknown> | null;
-      return await resolveEntitySchoolId("classSessions", classSessionRow);
-    }
-    case "assessments": {
-      const classSubjectId = toInt(row.classSubjectId);
-      if (!classSubjectId) return null;
-      const classSubject = (await getEntityById(
-        "classSubjects",
-        classSubjectId
-      )) as Record<string, unknown> | null;
-      return await resolveEntitySchoolId("classSubjects", classSubject);
-    }
-    case "assessmentScores": {
-      const assessmentId = toInt(row.assessmentId);
-      if (!assessmentId) return null;
-      const assessment = (await getEntityById(
-        "assessments",
-        assessmentId
-      )) as Record<string, unknown> | null;
-      return await resolveEntitySchoolId("assessments", assessment);
-    }
-    case "eventTargets": {
-      const eventId = toInt(row.eventId);
-      if (!eventId) return null;
-      const event = (await getEntityById("schoolEvents", eventId)) as Record<
-        string,
-        unknown
-      > | null;
-      return toInt(event?.schoolId);
-    }
-    case "communicationRecipients": {
-      const communicationId = toInt(row.communicationId);
-      if (!communicationId) return null;
-      const communication = (await getEntityById(
-        "communications",
-        communicationId
-      )) as Record<string, unknown> | null;
-      return toInt(communication?.schoolId);
-    }
+    case "schools": return toInt(row.id);
+    case "schoolYears": case "userSchools": case "schoolStaffProfiles": case "teachers": case "students": case "guardians": case "subjects": case "classes": case "studentComments": case "schoolEvents": case "communications": case "contacts": return toInt(row.schoolId);
+    case "studentGuardians": { const studentId = toInt(row.studentId); if (!studentId) return null; const student = (await getEntityById("students", studentId)) as Record<string, unknown> | null; return toInt(student?.schoolId); }
+    case "classSubjects": { const classId = toInt(row.classId); if (!classId) return null; const classRow = (await getEntityById("classes", classId)) as Record<string, unknown> | null; return toInt(classRow?.schoolId); }
+    case "classTeachers": { const csId = toInt(row.classSubjectId); if (!csId) return null; const cs = (await getEntityById("classSubjects", csId)) as Record<string, unknown> | null; return await resolveEntitySchoolId("classSubjects", cs); }
+    case "classEnrollments": { const classId = toInt(row.classId); if (!classId) return null; const classRow = (await getEntityById("classes", classId)) as Record<string, unknown> | null; return toInt(classRow?.schoolId); }
+    case "classSessions": { const csId = toInt(row.classSubjectId); if (!csId) return null; const cs = (await getEntityById("classSubjects", csId)) as Record<string, unknown> | null; return await resolveEntitySchoolId("classSubjects", cs); }
+    case "attendanceRecords": { const sessionId = toInt(row.classSessionId); if (!sessionId) return null; const session = (await getEntityById("classSessions", sessionId)) as Record<string, unknown> | null; return await resolveEntitySchoolId("classSessions", session); }
+    case "assessments": { const csId = toInt(row.classSubjectId); if (!csId) return null; const cs = (await getEntityById("classSubjects", csId)) as Record<string, unknown> | null; return await resolveEntitySchoolId("classSubjects", cs); }
+    case "assessmentScores": { const aId = toInt(row.assessmentId); if (!aId) return null; const a = (await getEntityById("assessments", aId)) as Record<string, unknown> | null; return await resolveEntitySchoolId("assessments", a); }
+    case "eventTargets": { const eId = toInt(row.eventId); if (!eId) return null; const e = (await getEntityById("schoolEvents", eId)) as Record<string, unknown> | null; return toInt(e?.schoolId); }
+    case "communicationRecipients": { const cId = toInt(row.communicationId); if (!cId) return null; const c = (await getEntityById("communications", cId)) as Record<string, unknown> | null; return toInt(c?.schoolId); }
     case "attachments": {
-      const ownerType = row.ownerType;
-      const ownerId = toInt(row.ownerId);
-      if (!ownerId || typeof ownerType !== "string") return null;
-
-      if (ownerType === "event") {
-        const event = (await getEntityById("schoolEvents", ownerId)) as Record<
-          string,
-          unknown
-        > | null;
-        return toInt(event?.schoolId);
-      }
-
-      if (ownerType === "communication") {
-        const communication = (await getEntityById(
-          "communications",
-          ownerId
-        )) as Record<string, unknown> | null;
-        return toInt(communication?.schoolId);
-      }
-
-      if (ownerType === "comment") {
-        const comment = (await getEntityById(
-          "studentComments",
-          ownerId
-        )) as Record<string, unknown> | null;
-        return toInt(comment?.schoolId);
-      }
-
+      const ownerType = row.ownerType; const ownerId = toInt(row.ownerId); if (!ownerId || typeof ownerType !== "string") return null;
+      if (ownerType === "event") { const e = (await getEntityById("schoolEvents", ownerId)) as Record<string, unknown> | null; return toInt(e?.schoolId); }
+      if (ownerType === "communication") { const c = (await getEntityById("communications", ownerId)) as Record<string, unknown> | null; return toInt(c?.schoolId); }
+      if (ownerType === "comment") { const c = (await getEntityById("studentComments", ownerId)) as Record<string, unknown> | null; return toInt(c?.schoolId); }
       return null;
     }
-    case "notifications": {
-      const userId = toInt(row.userId);
-      if (!userId) return null;
-      const schoolIds = await getUserManagedSchoolIds(userId);
-      return schoolIds[0] ?? null;
-    }
-    case "users":
-      return null;
-    default: {
-      const exhaustive: never = entity;
-      throw new Error(
-        `Unsupported entity in school resolver: ${String(exhaustive)}`
-      );
-    }
+    case "notifications": { const uId = toInt(row.userId); if (!uId) return null; const schoolIds = await getUserManagedSchoolIds(uId); return schoolIds[0] ?? null; }
+    case "users": return null;
+    case "absenceJustifications": case "auditLogs": case "schoolPlatforms": case "scheduleSlots": return toInt(row.schoolId);
+    default: { const exhaustive: never = entity; throw new Error(`Unsupported entity in school resolver: ${String(exhaustive)}`); }
   }
 }
 
-export async function validateAttachmentOwner(
-  ownerType: "event" | "communication" | "comment",
-  ownerId: number
-) {
-  if (ownerType === "event") {
-    return Boolean(await getEntityById("schoolEvents", ownerId));
-  }
-
-  if (ownerType === "communication") {
-    return Boolean(await getEntityById("communications", ownerId));
-  }
-
+export async function validateAttachmentOwner(ownerType: "event" | "communication" | "comment", ownerId: number) {
+  if (ownerType === "event") return Boolean(await getEntityById("schoolEvents", ownerId));
+  if (ownerType === "communication") return Boolean(await getEntityById("communications", ownerId));
   return Boolean(await getEntityById("studentComments", ownerId));
 }
 
-export async function listNotificationsForUser(
-  userId: number,
-  options: { unreadOnly?: boolean; limit?: number; offset?: number } = {}
-) {
-  const filters: RegistryFilters = { userId };
-  if (options.unreadOnly) {
-    filters.isRead = 0;
-  }
+export async function createNotification(notification: Omit<Notification, "id" | "createdAt" | "updatedAt" | "isRead">): Promise<Notification> {
+  return await createEntityRow("notifications", { ...notification, isRead: 0 }) as Notification;
+}
 
-  return await listEntityRows("notifications", {
-    filters,
-    limit: options.limit,
-    offset: options.offset,
-    orderBy: "createdAt",
-    orderDirection: "desc",
+export async function createCommunication(input: { schoolId: number; authorId: number | null; title: string; body: string; communicationType?: string; publishedAt?: string; relatedEventId?: number | null }) {
+  if (useMemoryStore()) {
+    const existing = memory.communications.find(c => c.schoolId === input.schoolId && c.title === input.title && c.body === input.body);
+    if (existing) return existing;
+    const created: Communication = { id: memoryIds.communications++, schoolId: input.schoolId, authorUserId: input.authorId ?? null, title: input.title, body: input.body, communicationType: input.communicationType ?? "announcement", relatedEventId: input.relatedEventId ?? null, deletedAt: null, createdAt: new Date(), updatedAt: new Date() };
+    memory.communications.push(created);
+    return created;
+  }
+  return await supaInsert<Communication>("communications", {
+    schoolId: input.schoolId,
+    authorUserId: input.authorId ?? null,
+    title: input.title,
+    body: input.body,
+    communicationType: input.communicationType ?? "announcement",
+    relatedEventId: input.relatedEventId ?? null,
   });
 }
 
-export async function markNotificationAsReadForUser(
-  notificationId: number,
-  userId: number
-) {
-  const current = (await getEntityById(
-    "notifications",
-    notificationId
-  )) as Record<string, unknown> | null;
-
-  if (!current || toInt(current.userId) !== userId) {
-    return null;
+export async function createSchoolEvent(input: { schoolId: number; authorId: number | null; title: string; description?: string | null; eventType?: string; eventDate: string }) {
+  if (useMemoryStore()) {
+    const existing = memory.schoolEvents.find(e => e.schoolId === input.schoolId && e.title === input.title && e.startsAt === input.eventDate);
+    if (existing) return existing;
+    const created: SchoolEvent = { id: memoryIds.schoolEvents++, schoolId: input.schoolId, title: input.title, description: input.description ?? null, eventType: input.eventType ?? "evento_escolar", startsAt: input.eventDate, endsAt: null, createdByUserId: input.authorId ?? null, deletedAt: null, createdAt: new Date(), updatedAt: new Date() };
+    memory.schoolEvents.push(created);
+    return created;
   }
-
-  return await updateEntityRow("notifications", notificationId, {
-    isRead: 1,
-    readAt: new Date(),
+  return await supaInsert<SchoolEvent>("schoolEvents", {
+    schoolId: input.schoolId,
+    createdByUserId: input.authorId ?? null,
+    title: input.title,
+    description: input.description ?? null,
+    eventType: input.eventType ?? "evento_escolar",
+    startsAt: input.eventDate,
   });
+}
+
+export async function listNotificationsForUser(userId: number, options: { unreadOnly?: boolean; limit?: number; offset?: number } = {}) {
+  const filters: RegistryFilters = { userId };
+  if (options.unreadOnly) filters.isRead = 0;
+  return await listEntityRows("notifications", { filters, limit: options.limit, offset: options.offset, orderBy: "createdAt", orderDirection: "desc" });
+}
+
+export async function markNotificationAsReadForUser(notificationId: number, userId: number) {
+  const current = (await getEntityById("notifications", notificationId)) as Record<string, unknown> | null;
+  if (!current || toInt(current.userId) !== userId) return null;
+  return await updateEntityRow("notifications", notificationId, { isRead: 1, readAt: new Date() });
 }
 
 export async function markAllNotificationsAsReadForUser(userId: number) {
-  const notificationsForUser = await listNotificationsForUser(userId, {
-    unreadOnly: true,
-    limit: 500,
-  });
-
+  const notificationsForUser = await listNotificationsForUser(userId, { unreadOnly: true, limit: 500 });
   let updated = 0;
-
   for (const notification of notificationsForUser) {
     const id = toInt((notification as Record<string, unknown>).id);
     if (!id) continue;
-    await updateEntityRow("notifications", id, {
-      isRead: 1,
-      readAt: new Date(),
-    });
+    await updateEntityRow("notifications", id, { isRead: 1, readAt: new Date() });
     updated += 1;
   }
-
   return { updated };
+}
+
+export async function getClassSessionById(id: number) {
+  if (useMemoryStore()) return memory.classSessions.find(s => s.id === id) ?? null;
+  return await supaSelectOne<ClassSession>("classSessions", { id });
+}
+
+export async function isStudentEnrolledInClass(studentId: number, classId: number) {
+  if (useMemoryStore()) return memory.classEnrollments.some(e => e.studentId === studentId && e.classId === classId && e.status === "ativo");
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { data } = await supabase.from("classEnrollments").select("id").eq("studentId", studentId).eq("classId", classId).eq("status", "ativo").limit(1);
+  return (data?.length ?? 0) > 0;
+}
+
+export async function isTeacherOfClassSubject(teacherId: number, classSubjectId: number) {
+  if (useMemoryStore()) return memory.classTeachers.some(ct => ct.teacherId === teacherId && ct.classSubjectId === classSubjectId);
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { data } = await supabase.from("classTeachers").select("id").eq("teacherId", teacherId).eq("classSubjectId", classSubjectId).limit(1);
+  return (data?.length ?? 0) > 0;
+}
+
+export async function attendanceRecordExists(classSessionId: number, studentId: number) {
+  if (useMemoryStore()) return memory.attendanceRecords.some(r => r.classSessionId === classSessionId && r.studentId === studentId);
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { data } = await supabase.from("attendanceRecords").select("id").eq("classSessionId", classSessionId).eq("studentId", studentId).limit(1);
+  return (data?.length ?? 0) > 0;
+}
+
+export async function getAssessmentById(id: number) {
+  if (useMemoryStore()) return memory.assessments.find(a => a.id === id) ?? null;
+  return await supaSelectOne<Assessment>("assessments", { id });
+}
+
+export async function getClassSubjectById(id: number) {
+  if (useMemoryStore()) return memory.classSubjects.find(cs => cs.id === id) ?? null;
+  return await supaSelectOne<ClassSubject>("classSubjects", { id });
+}
+
+export async function getCommentsByTeacher(teacherId: number) {
+  if (useMemoryStore()) {
+    return memory.studentComments.filter(c => c.teacherId === teacherId).map(c => {
+      const student = memory.students.find(s => s.id === c.studentId);
+      const teacher = memory.teachers.find(t => t.id === c.teacherId);
+      return { id: c.id, category: c.category, content: c.content, createdAt: c.createdAt, author: teacher?.name ?? null, studentName: student?.name ?? null };
+    }).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_comments_by_teacher", { p_teacher_id: teacherId });
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(row => row as unknown as { id: number; category: string; content: string; createdAt: Date; author: string | null; studentName: string | null });
+}
+
+export async function getStudentAttendanceStats(userId: number) {
+  if (useMemoryStore()) {
+    const student = memory.students.find(s => s.userId === userId);
+    if (!student) return { total: 0, presents: 0, absents: 0, justified: 0, pct: 100, bySubject: [] };
+    const records = memory.attendanceRecords.filter(r => r.studentId === student.id);
+    const presents = records.filter(r => r.status === "present").length;
+    const absents = records.filter(r => r.status === "absent").length;
+    const justified = records.filter(r => r.status === "justified").length;
+    const total = records.length;
+    const pct = total > 0 ? Math.round((presents / total) * 100) : 100;
+    const bySubjectMap = new Map<number, { subjectId: number; subject: string; classes: number; absences: number }>();
+    for (const r of records) {
+      const session = memory.classSessions.find(s => s.id === r.classSessionId); if (!session) continue;
+      const cs = memory.classSubjects.find(c => c.id === session.classSubjectId); if (!cs) continue;
+      const sub = memory.subjects.find(s => s.id === cs.subjectId);
+      const subjectId = cs.subjectId;
+      let entry = bySubjectMap.get(subjectId);
+      if (!entry) { entry = { subjectId, subject: sub?.name ?? "—", classes: 0, absences: 0 }; bySubjectMap.set(subjectId, entry); }
+      entry.classes++;
+      if (r.status === "absent") entry.absences++;
+    }
+    const bySubject = Array.from(bySubjectMap.values()).map(e => ({ ...e, pct: e.classes > 0 ? Math.round(((e.classes - e.absences) / e.classes) * 100) : 100 }));
+    return { total, presents, absents, justified, pct, bySubject };
+  }
+  const supabase = getSupabase();
+  if (!supabase) return { total: 0, presents: 0, absents: 0, justified: 0, pct: 100, bySubject: [] };
+  const { data, error } = await supabase.rpc("get_student_attendance_stats", { p_user_id: userId });
+  if (error || !data) return { total: 0, presents: 0, absents: 0, justified: 0, pct: 100, bySubject: [] };
+  const result = data as Record<string, unknown>;
+  return result as unknown as { total: number; presents: number; absents: number; justified: number; pct: number; bySubject: Array<{ subjectId: number; subject: string; classes: number; absences: number; pct: number }> };
+}
+
+export async function getStudentClassInfo(userId: number) {
+  if (useMemoryStore()) {
+    const student = memory.students.find(s => s.userId === userId);
+    if (!student) return null;
+    const enrollment = memory.classEnrollments.find(e => e.studentId === student.id && e.status === "ativo");
+    if (!enrollment) return null;
+    const cls = memory.classes.find(c => c.id === enrollment.classId);
+    if (!cls) return null;
+    const sy = memory.schoolYears.find(y => y.id === cls.schoolYearId);
+    return { classId: cls.id, className: cls.name, classCode: cls.code ?? cls.name, schoolYear: sy?.name ?? "", shift: cls.shift ?? null, course: cls.course ?? null };
+  }
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("get_student_class_info", { p_user_id: userId });
+  if (error || !data || (data as Record<string, unknown>[]).length === 0) return null;
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
+  const camel = row as Record<string, unknown>;
+  return { ...camel, classCode: (camel as Record<string, unknown>).classCode ?? (camel as Record<string, unknown>).className };
+}
+
+export async function getStudentUpcomingEvents(userId: number) {
+  if (useMemoryStore()) {
+    const student = memory.students.find(s => s.userId === userId);
+    if (!student) return [];
+    const enrollment = memory.classEnrollments.find(e => e.studentId === student.id && e.status === "ativo");
+    const classId = enrollment?.classId;
+    const now = new Date().toISOString().split("T")[0];
+    return memory.schoolEvents.filter(e => {
+      if (e.schoolId !== student.schoolId) return false;
+      if (e.startsAt < now) return false;
+      const target = memory.eventTargets.find(t => t.eventId === e.id);
+      if (!target) return true;
+      if (target.targetType === "school") return true;
+      if (target.targetType === "class" && target.targetRefId === classId) return true;
+      return false;
+    }).sort((a, b) => (a.startsAt < b.startsAt ? -1 : 1)).slice(0, 10).map(e => ({ id: e.id, title: e.title, eventType: e.eventType, eventDate: e.startsAt, description: e.description }));
+  }
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_student_upcoming_events", { p_user_id: userId });
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map(row => row as unknown as { id: number; title: string; eventType: string; eventDate: string; description: string | null });
+}
+
+export async function getStudentNextExam(userId: number) {
+  if (useMemoryStore()) {
+    const student = memory.students.find(s => s.userId === userId);
+    if (!student) return null;
+    const enrollment = memory.classEnrollments.find(e => e.studentId === student.id && e.status === "ativo");
+    if (!enrollment) return null;
+    const classSubjects = memory.classSubjects.filter(cs => cs.classId === enrollment.classId);
+    const now = new Date().toISOString().split("T")[0];
+    let earliest: { subject: string; date: string } | null = null;
+    for (const cs of classSubjects) {
+      const subject = memory.subjects.find(s => s.id === cs.subjectId);
+      const assessments = memory.assessments.filter(a => a.classSubjectId === cs.id && a.assessmentDate >= now).sort((a, b) => (a.assessmentDate < b.assessmentDate ? -1 : 1));
+      if (assessments[0] && (!earliest || assessments[0].assessmentDate < earliest.date)) earliest = { subject: subject?.name ?? "—", date: assessments[0].assessmentDate };
+    }
+    return earliest;
+  }
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("get_student_next_exam", { p_user_id: userId });
+  if (error || !data) return null;
+  const rows = data as Record<string, unknown>[];
+  if (!rows || rows.length === 0) return null;
+  return rows[0] as unknown as { subject: string; date: string };
+}
+
+export async function getSchoolPlatforms(schoolId: number) {
+  if (useMemoryStore()) {
+    return memory.schoolPlatforms.filter(p => p.schoolId === schoolId).sort((a, b) => a.sortOrder - b.sortOrder).map(p => ({ id: p.id, name: p.name, description: p.description, url: p.url, emoji: p.emoji, colorGradient: p.colorGradient }));
+  }
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("schoolPlatforms").select("*").eq("schoolId", schoolId).order("sortOrder", { ascending: true });
+  return data ? data as Record<string, unknown>[] as SchoolPlatform[] : [];
+}
+
+export async function getScheduleSlots(schoolId: number, shift: string) {
+  if (useMemoryStore()) {
+    return memory.scheduleSlots.filter(s => s.schoolId === schoolId && s.shift === shift).sort((a, b) => a.slotNumber - b.slotNumber).map(s => ({ id: s.id, slotNumber: s.slotNumber, startTime: s.startTime, endTime: s.endTime }));
+  }
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("scheduleSlots").select("*").eq("schoolId", schoolId).eq("shift", shift).order("slotNumber", { ascending: true });
+  return data ? data as Record<string, unknown>[] as ScheduleSlot[] : [];
+}
+
+export async function checkDatabaseConnection(): Promise<boolean> {
+  if (useMemoryStore()) return false;
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase.from("users").select("id").limit(1);
+  return !error;
+}
+
+export async function listSchools(limit: number = 100) {
+  if (useMemoryStore()) return memory.schools.slice(0, limit);
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data } = await supabase.from("schools").select("*").limit(limit);
+  return data ? data as Record<string, unknown>[] as School[] : [];
 }
