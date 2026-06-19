@@ -2,10 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { Clock, Eye, MessageSquare, Users, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const TARGET_LABELS: Record<string, string> = {
   all: "Todos",
@@ -16,7 +16,7 @@ const TARGET_LABELS: Record<string, string> = {
 
 export default function SchoolCommunications() {
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+  const schoolId = mySchools?.[0]?.schoolId;
 
   const { data: comms } = trpc.registry.list.useQuery(
     {
@@ -36,7 +36,7 @@ export default function SchoolCommunications() {
   );
   const { data: recipients } = trpc.registry.list.useQuery({
     entity: "communicationRecipients" as const,
-    limit: 2000,
+    limit: 500,
   });
   const { data: users } = trpc.registry.list.useQuery({
     entity: "users" as const,
@@ -100,9 +100,6 @@ export default function SchoolCommunications() {
         body: form.body,
         communicationType: "announcement",
         targetConfig: form.target as "all" | "guardians_only" | "teachers_only",
-        scheduledAt: form.scheduledAt
-          ? new Date(form.scheduledAt).toISOString()
-          : undefined,
       });
       toast.success("Comunicado publicado!");
       setShowForm(false);

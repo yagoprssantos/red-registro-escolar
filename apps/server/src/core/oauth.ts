@@ -11,7 +11,10 @@ import {
   createTeacherProfile,
   createUserSchool,
   getSchoolByEmail,
+  getUserByEmail,
   getUserByOpenId,
+  getUsersWithoutSupabaseAuth,
+  linkUserOpenId,
   linkStudentGuardian,
   listEntityRows,
   upsertUser,
@@ -357,7 +360,17 @@ async function syncLocalUserFromSupabaseUser(options: {
   const { supabaseUser, requestedProfile, loginMethod } = options;
 
   const openId = `supabase:${supabaseUser.id}`;
-  const existingLocalUser = await getUserByOpenId(openId);
+  let existingLocalUser = await getUserByOpenId(openId);
+
+  // Link seeded/existing DB users by email on first Supabase login
+  if (!existingLocalUser && supabaseUser.email) {
+    const userByEmail = await getUserByEmail(supabaseUser.email);
+    if (userByEmail) {
+      await linkUserOpenId(userByEmail.id, openId);
+      existingLocalUser = await getUserByOpenId(openId);
+    }
+  }
+
   const metadataProfile = extractProfileFromMetadata(supabaseUser);
 
   const resolvedProfile = isUserProfile(existingLocalUser?.defaultProfile)
@@ -639,6 +652,12 @@ async function bootstrapDefaultAdminAccounts() {
       name: ENV.defaultAdminSchoolName,
       email: ENV.defaultAdminSchoolInstitutionEmail,
       status: "ativo",
+      phone: null,
+      address: null,
+      city: null,
+      state: null,
+      zipCode: null,
+      studentCount: null,
     }));
 
   if (!school) {
@@ -696,6 +715,57 @@ async function bootstrapDefaultAdminAccounts() {
   }
 
   console.log("[Auth] Default profile admin bootstrap finished");
+}
+
+async function bootstrapSeedUsers() {
+  if (!ENV.bootstrapSeedUsers) {
+    return;
+  }
+
+  if (!hasSupabaseAuthConfig()) {
+    console.warn(
+      "[Auth] AUTH_BOOTSTRAP_SEED_USERS is enabled, but Supabase Auth is not configured."
+    );
+    return;
+  }
+
+  const passwordByRole: Record<string, string> = {
+    admin: ENV.seedPasswordSchool,
+    school_staff: ENV.seedPasswordSchool,
+    teacher: ENV.seedPasswordTeacher,
+    student: ENV.seedPasswordStudent,
+    guardian: ENV.seedPasswordGuardian,
+  };
+
+  const users = await getUsersWithoutSupabaseAuth();
+  if (!users.length) {
+    console.log("[Auth] No seed users to bootstrap");
+    return;
+  }
+
+  console.log(`[Auth] Bootstrapping ${users.length} seed users into Supabase Auth`);
+
+  for (const user of users) {
+    if (!user.email) continue;
+    const password = passwordByRole[user.role] ?? ENV.seedPasswordStudent;
+    if (!password) continue;
+
+    const seed: DefaultSeedAccount = {
+      profile: (user.defaultProfile ?? user.role) as DefaultSeedAccount["profile"],
+      email: user.email,
+      name: user.name ?? user.email,
+    };
+
+    const supabaseUser = await ensureSupabaseAccountForSeed(seed, password);
+    if (!supabaseUser?.id) continue;
+
+    const newOpenId = `supabase:${supabaseUser.id}`;
+    if (user.openId !== newOpenId) {
+      await linkUserOpenId(user.id, newOpenId);
+    }
+  }
+
+  console.log("[Auth] Seed users bootstrap finished");
 }
 
 export function registerOAuthRoutes(app: Express) {
@@ -906,5 +976,9 @@ export function registerOAuthRoutes(app: Express) {
 
   void bootstrapDefaultAdminAccounts().catch(error => {
     console.error("[Auth] Default admin bootstrap failed", error);
+  });
+
+  void bootstrapSeedUsers().catch(error => {
+    console.error("[Auth] Seed users bootstrap failed", error);
   });
 }

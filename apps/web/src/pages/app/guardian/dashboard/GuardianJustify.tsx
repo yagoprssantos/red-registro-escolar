@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { CheckCircle, Clock, Upload, XCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 export default function GuardianJustify() {
   const { data: students } = trpc.profiles.guardian.students.useQuery();

@@ -141,11 +141,14 @@ export const attendanceRouter = router({
             );
 
             if (teacherProfile && classSubject) {
+              const subject = await getEntityById("subjects", classSubject.subjectId);
+              const subjectName = (subject as Record<string, unknown>)?.name as string ?? "Unknown Subject";
+
               // Single absence notification
               await NotificationService.notifyAbsence(
                 input.studentId,
                 session.lessonDate,
-                classSubject.name ?? "Unknown Subject",
+                subjectName,
                 teacherProfile.name
               );
 
@@ -153,7 +156,7 @@ export const attendanceRouter = router({
               await NotificationService.notifyConsecutiveAbsence(
                 input.studentId,
                 session.lessonDate,
-                classSubject.name ?? "Unknown Subject"
+                subjectName
               );
             }
           }

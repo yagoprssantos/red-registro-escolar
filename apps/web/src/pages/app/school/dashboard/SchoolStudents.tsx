@@ -2,14 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { ChevronRight, GraduationCap, Search, UserPlus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 export default function SchoolStudents() {
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+  const schoolId = mySchools?.[0]?.schoolId;
 
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);

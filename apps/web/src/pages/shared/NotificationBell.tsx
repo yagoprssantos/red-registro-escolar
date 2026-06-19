@@ -2,7 +2,14 @@ import { trpc } from "@/lib/trpc";
 import { Bell, Check, CheckCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-type RegistryRow = Record<string, unknown>;
+type NotificationItem = {
+  id: number | string;
+  isRead?: boolean;
+  notificationType?: string | null;
+  title?: string | null;
+  body?: string | null;
+  createdAt?: string | Date | null;
+};
 
 const NOTIFICATION_ICONS: Record<string, string> = {
   absence_alert: "🔴",
@@ -26,18 +33,18 @@ export function NotificationBell() {
       { refetchInterval: 30000 }
     );
 
-  const unreadCount = (notifications ?? []).filter(
-    (n: RegistryRow) => !n.isRead
-  ).length;
+  const items = (notifications ?? []) as unknown as NotificationItem[];
+
+  const unreadCount = items.filter(n => !n.isRead).length;
 
   const markRead = trpc.registry.notifications.markRead.useMutation({
     onSuccess: () => refetch(),
   });
+
   const markAllRead = trpc.registry.notifications.markAllRead.useMutation({
     onSuccess: () => refetch(),
   });
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
       if (
@@ -50,20 +57,19 @@ export function NotificationBell() {
         setOpen(false);
       }
     }
+
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [open]);
 
-  // Close on Escape
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, []);
-
-  const items = (notifications ?? []) as RegistryRow[];
 
   return (
     <div className="relative">
@@ -86,13 +92,12 @@ export function NotificationBell() {
           ref={panelRef}
           className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border bg-card shadow-lg"
         >
-          {/* Header */}
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h3 className="text-sm font-semibold">Notificações</h3>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
                 <button
-                  onClick={() => markAllRead.mutate({})}
+                  onClick={() => markAllRead.mutate()}
                   className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   disabled={markAllRead.isPending}
                 >
@@ -103,7 +108,6 @@ export function NotificationBell() {
             </div>
           </div>
 
-          {/* Notification list */}
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 && (
               <div className="flex flex-col items-center gap-2 px-4 py-8 text-muted-foreground">
@@ -111,11 +115,13 @@ export function NotificationBell() {
                 <p className="text-sm">Nenhuma notificação</p>
               </div>
             )}
+
             {items.map(n => {
               const isUnread = !n.isRead;
               const icon =
                 NOTIFICATION_ICONS[String(n.notificationType ?? "general")] ??
                 "🔔";
+
               const createdAt = n.createdAt
                 ? new Date(String(n.createdAt)).toLocaleDateString("pt-BR", {
                     day: "2-digit",
@@ -124,6 +130,8 @@ export function NotificationBell() {
                     minute: "2-digit",
                   })
                 : "";
+
+              const bodyText = typeof n.body === "string" ? n.body.trim() : "";
 
               return (
                 <div
@@ -134,8 +142,9 @@ export function NotificationBell() {
                       : "hover:bg-muted/30"
                   }`}
                 >
-                  <div className="flex-shrink-0 text-base pt-0.5">{icon}</div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-shrink-0 pt-0.5 text-base">{icon}</div>
+
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <p
                         className={`text-sm leading-snug ${
@@ -146,11 +155,10 @@ export function NotificationBell() {
                       >
                         {String(n.title ?? "")}
                       </p>
+
                       {isUnread && (
                         <button
-                          onClick={() =>
-                            markRead.mutate({ id: n.id as number })
-                          }
+                          onClick={() => markRead.mutate({ id: Number(n.id) })}
                           className="flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                           aria-label="Marcar como lida"
                         >
@@ -158,11 +166,13 @@ export function NotificationBell() {
                         </button>
                       )}
                     </div>
-                    {n.body && (
-                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                        {String(n.body)}
+
+                    {bodyText && (
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                        {bodyText}
                       </p>
                     )}
+
                     <p className="mt-1 text-[10px] text-muted-foreground/60">
                       {createdAt}
                     </p>

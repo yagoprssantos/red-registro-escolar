@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { BarChart3 } from "lucide-react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 function scoreColor(score: number, max: number): string {
   const pct = max > 0 ? (score / max) * 100 : 0;
@@ -19,15 +19,13 @@ function scoreBg(score: number, max: number): string {
 
 export default function StudentTranscript() {
   const { data: me } = trpc.profiles.student.me.useQuery();
-  const student = me as RegistryRow | null | undefined;
+  const studentId = (me as Record<string, unknown> | null | undefined)?.id as number | undefined;
 
-  const { data: gradesData } = trpc.profiles.student.grades.useQuery(
-    undefined,
-    {
-      enabled: !!student,
-    }
+  const { data: scoresData } = trpc.registry.list.useQuery(
+    { entity: "assessmentScores" as const, filters: studentId ? { studentId } : {}, limit: 200 },
+    { enabled: !!studentId }
   );
-  const scores = (gradesData ?? []) as RegistryRow[];
+  const scores = (scoresData ?? []) as RegistryRow[];
 
   const { data: assessments } = trpc.registry.list.useQuery({
     entity: "assessments" as const,

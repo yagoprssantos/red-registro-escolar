@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
+import type { Student, StudentComment } from "@/pages/shared/Types";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const CATEGORIES = [
   { value: "all", label: "Todos" },
@@ -10,6 +10,11 @@ const CATEGORIES = [
   { value: "comentario", label: "💬 Comentário" },
 ] as const;
 
+type GuardianComment = StudentComment & {
+  teacherName?: string | null;
+  authorName?: string | null;
+};
+
 export default function GuardianComments() {
   const { data: students } = trpc.profiles.guardian.students.useQuery();
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(
@@ -17,14 +22,14 @@ export default function GuardianComments() {
   );
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
-  const studentList = (students ?? []) as RegistryRow[];
+  const studentList = (students ?? []) as Student[];
 
   const { data: comments } = trpc.comments.forStudent.useQuery(
     { studentId: selectedStudentId! },
     { enabled: !!selectedStudentId }
   );
 
-  const allComments = (comments ?? []) as RegistryRow[];
+  const allComments = (comments ?? []) as GuardianComment[];
   const filtered =
     filterCategory === "all"
       ? allComments
@@ -52,7 +57,6 @@ export default function GuardianComments() {
         Diferença vs aluno: nome do professor <strong>VISÍVEL</strong>
       </p>
 
-      {/* Category filter */}
       <div className="flex flex-wrap gap-1">
         {CATEGORIES.map(cat => (
           <button
@@ -80,12 +84,13 @@ export default function GuardianComments() {
             comment.teacherName || comment.authorName || "Professor"
           );
           const vis = String(comment.visibility);
+
           return (
             <div
               key={String(comment.id)}
               className="rounded-lg border bg-card px-4 py-3"
             >
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm">
                   {cat === "elogio"
                     ? "⭐"
@@ -118,6 +123,7 @@ export default function GuardianComments() {
                     : ""}
                 </span>
               </div>
+
               <p className="mt-1 text-sm text-foreground">
                 {String(comment.content)}
               </p>

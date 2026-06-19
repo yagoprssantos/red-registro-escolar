@@ -28,6 +28,7 @@ import { eventsRouter } from "./domain/events/events.router";
 import { gradesRouter } from "./domain/grades/grades.router";
 import { justificationsRouter } from "./domain/justifications/justifications.router";
 import { schoolRouter } from "./domain/school/school.router";
+import { tasksRouter } from "./domain/tasks/tasks.router";
 import { profilesRouter } from "./profiles";
 import { registryRouter } from "./registry";
 
@@ -42,6 +43,7 @@ export const appRouter = router({
   communications: communicationsRouter,
   events: eventsRouter,
   school: schoolRouter,
+  tasks: tasksRouter,
   audit: auditRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

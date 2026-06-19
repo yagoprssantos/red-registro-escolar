@@ -12,9 +12,7 @@ import { trpc } from "@/lib/trpc";
 import {
   Bell,
   BookOpenCheck,
-  Calendar,
   ClipboardList,
-  ExternalLink,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -104,10 +102,7 @@ export default function StudentDashboard() {
   const gpa = me?.averageGrade ?? 0;
   const gpaTrend = gpa >= 7 ? ("up" as const) : ("down" as const);
   const absencesLeft = attendance
-    ? Math.max(
-        0,
-        Math.floor(0.2 * attendance.total) - attendance.absents
-      )
+    ? Math.max(0, Math.floor(0.2 * attendance.total) - attendance.absents)
     : 0;
   const unreadNotifs = (notifications ?? []).length;
   const peDeMeiaStatus = getPeDeMeiaStatus(attendancePct);
@@ -161,10 +156,13 @@ export default function StudentDashboard() {
   const nextExamDisplay = nextExam
     ? {
         subject: nextExam.subject,
-        date: new Date(nextExam.date + "T00:00:00").toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "2-digit",
-        }),
+        date: new Date(nextExam.date + "T00:00:00").toLocaleDateString(
+          "pt-BR",
+          {
+            day: "2-digit",
+            month: "2-digit",
+          }
+        ),
       }
     : null;
 
@@ -179,9 +177,9 @@ export default function StudentDashboard() {
         </h1>
         <p className="font-body text-sm text-muted-foreground">
           {classInfo
-            ? `${me?.grade ?? ""}º ano · ${classInfo.course ?? ""} · Turma ${classInfo.classCode}`
+            ? `${me?.grade ?? ""} · ${classInfo.course ?? ""} · Turma ${classInfo.classCode}`
             : me?.grade
-              ? `${me.grade}º ano · ${me.school ?? ""}`
+              ? `${me.grade} · ${me.school ?? ""}`
               : "Carregando..."}
         </p>
       </div>
@@ -207,8 +205,8 @@ export default function StudentDashboard() {
           </AlertTitle>
           <AlertDescription className="font-body text-sm text-amber-700/80">
             Sua frequência está em {attendancePct}%. O mínimo para não bloquear
-            é {MIN_ATTENDANCE}%. Você pode faltar mais {absencesLeft} vezes neste
-            período.
+            é {MIN_ATTENDANCE}%. Você pode faltar mais {absencesLeft} vezes
+            neste período.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -279,7 +277,8 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
 
-        {/* Próxima Prova */}
+        {/*
+        Próxima Prova
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
@@ -303,7 +302,7 @@ export default function StudentDashboard() {
               </p>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Avisos */}
         <Card>
@@ -414,13 +413,19 @@ export default function StudentDashboard() {
                     dataKey="subject"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                    tick={{
+                      fontSize: 11,
+                      fill: "var(--color-muted-foreground)",
+                    }}
                   />
                   <YAxis
                     domain={[0, 100]}
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                    tick={{
+                      fontSize: 11,
+                      fill: "var(--color-muted-foreground)",
+                    }}
                   />
                   <ChartTooltip
                     content={<ChartTooltipContent indicator="dot" />}
@@ -492,7 +497,7 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      {/* Distribuição de notas */}
+      {/* Distribuição de notas
       {grades && grades.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
@@ -521,7 +526,9 @@ export default function StudentDashboard() {
                   tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
                   allowDecimals={false}
                 />
-                <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
+                <ChartTooltip
+                  content={<ChartTooltipContent indicator="dot" />}
+                />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48}>
                   {gradeDistribution.map((entry, idx) => {
                     const fill =
@@ -537,7 +544,7 @@ export default function StudentDashboard() {
             </ChartContainer>
           </CardContent>
         </Card>
-      )}
+      )} */}
 
       {/* Próximos Eventos */}
       {(events ?? []).length > 0 && (
@@ -551,7 +558,7 @@ export default function StudentDashboard() {
             </button>
           </div>
           <div className="space-y-2">
-            {(events ?? []).map((evt) => {
+            {(events ?? []).map(evt => {
               const meta = EVENT_TYPE_META[evt.eventType] ?? {
                 icon: "📅",
                 label: "Evento",
@@ -579,32 +586,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-
-      {/* Plataformas Parceiras */}
-      <div>
-        <h2 className="font-heading text-sm font-semibold text-foreground mb-3">
-          Plataformas Parceiras
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {(((platforms ?? []).length > 0
-            ? (platforms ?? []).map(p => ({ name: p.name, href: p.url }))
-            : FALLBACK_PLATFORMS
-          )).map(p => (
-            <a
-              key={p.name}
-              href={p.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-muted/60 hover:border-red-brand/30 group"
-            >
-              <ExternalLink className="size-3.5 text-muted-foreground group-hover:text-red-brand transition-colors shrink-0" />
-              <span className="font-body text-xs font-medium text-foreground group-hover:text-red-brand truncate transition-colors">
-                {p.name}
-              </span>
-            </a>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

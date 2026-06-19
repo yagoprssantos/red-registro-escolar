@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { Calendar, Hash, Mail, Phone, Shield, User } from "lucide-react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 export default function StudentPersonal() {
   const { data: me } = trpc.profiles.student.me.useQuery();

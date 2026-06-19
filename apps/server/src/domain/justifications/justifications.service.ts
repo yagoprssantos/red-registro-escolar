@@ -110,7 +110,7 @@ export class JustificationsService {
   }
 
   static async listBySchool(schoolId: number, status?: string) {
-    const filters: Record<string, unknown> = { schoolId };
+    const filters: Record<string, string | number | boolean | null | undefined> = { schoolId };
     if (status) filters.status = status;
 
     return await listEntityRows("absenceJustifications", {

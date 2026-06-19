@@ -7,326 +7,28 @@ import {
   isUserProfile,
   type UserProfile,
 } from "@/lib/profiles";
-import { AnimatePresence, motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
-  Bell,
-  BookOpenCheck,
-  Calendar,
-  CalendarClock,
+  getFirstSectionId,
+  getInitials,
+  PROFILE_ACCENT,
+  PROFILE_INITIALS_BG,
+  PROFILE_SECTIONS,
+  resolveProfileFromRole,
+  type DashboardSection,
+} from "@/pages/shared/Dashboard";
+import { AnimatePresence, motion } from "framer-motion";
+import {
   ChevronLeft,
   ChevronRight,
-  ClipboardList,
-  Clock,
-  FileText,
-  GraduationCap,
-  Heart,
-  HelpCircle,
-  LayoutGrid,
-  Link2,
   LogOut,
-  Megaphone,
-  MessageSquare,
-  Monitor,
   School,
   Settings,
-  ShieldCheck,
-  User,
   Users,
   X,
 } from "lucide-react";
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { NotificationBell } from "./NotificationBell";
-
-// ── Types ─────────────────────────────────────────────────────────
-type RegistryRow = Record<string, unknown>;
-
-type DashboardSection = {
-  id: string;
-  title: string;
-  description: string;
-  icon: LucideIcon;
-};
-
-// ── Profile colours (avatar accent per profile) ───────────────────
-const PROFILE_ACCENT: Record<UserProfile, string> = {
-  school: "from-red-brand to-red-700",
-  teacher: "from-blue-brand to-blue-700",
-  student: "from-emerald-600 to-emerald-800",
-  guardian: "from-violet-600 to-violet-800",
-};
-
-const PROFILE_INITIALS_BG: Record<UserProfile, string> = {
-  school: "bg-red-brand/15 text-red-brand",
-  teacher: "bg-blue-brand/15 text-blue-brand",
-  student: "bg-emerald-500/15 text-emerald-600",
-  guardian: "bg-violet-500/15 text-violet-600",
-};
-
-// ── Role → profile map ────────────────────────────────────────────
-const PROFILE_BY_ROLE: Record<string, UserProfile> = {
-  admin: "school",
-  school_staff: "school",
-  teacher: "teacher",
-  student: "student",
-  guardian: "guardian",
-};
-
-// ── Sections ──────────────────────────────────────────────────────
-const PROFILE_SECTIONS: Record<UserProfile, DashboardSection[]> = {
-  school: [
-    {
-      id: "overview",
-      title: "Dashboard",
-      description: "Resumo da operação institucional.",
-      icon: LayoutGrid,
-    },
-    {
-      id: "students",
-      title: "Alunos",
-      description: "Cadastro e acompanhamento de estudantes.",
-      icon: GraduationCap,
-    },
-    {
-      id: "classes",
-      title: "Turmas",
-      description: "Turmas e matrículas.",
-      icon: Users,
-    },
-    {
-      id: "teachers",
-      title: "Professores",
-      description: "Corpo docente.",
-      icon: School,
-    },
-    {
-      id: "communications",
-      title: "Comunicados",
-      description: "Mensagens para a comunidade escolar.",
-      icon: MessageSquare,
-    },
-    {
-      id: "events",
-      title: "Eventos",
-      description: "Calendário escolar.",
-      icon: CalendarClock,
-    },
-    {
-      id: "justifications",
-      title: "Justificativas",
-      description: "Revisão de justificativas de falta.",
-      icon: ShieldCheck,
-    },
-    {
-      id: "reports",
-      title: "Relatórios",
-      description: "Frequência e desempenho.",
-      icon: FileText,
-    },
-    {
-      id: "settings",
-      title: "Configurações",
-      description: "Ano letivo, usuários e LGPD.",
-      icon: Settings,
-    },
-  ],
-  teacher: [
-    {
-      id: "overview",
-      title: "Início",
-      description: "Resumo das turmas e do dia letivo.",
-      icon: LayoutGrid,
-    },
-    {
-      id: "attendance",
-      title: "Chamada",
-      description: "Registro rápido de faltas e presenças.",
-      icon: ClipboardList,
-    },
-    {
-      id: "grades",
-      title: "Avaliações",
-      description: "Lançamento e atualização de notas.",
-      icon: BookOpenCheck,
-    },
-    {
-      id: "comments",
-      title: "Comentários",
-      description: "Ocorrências, elogios e melhorias.",
-      icon: FileText,
-    },
-    {
-      id: "communications",
-      title: "Comunicados",
-      description: "Avisos da escola.",
-      icon: Bell,
-    },
-  ],
-  student: [
-    {
-      id: "overview",
-      title: "Início",
-      description: "Resumo geral.",
-      icon: LayoutGrid,
-    },
-    {
-      id: "personal",
-      title: "Dados Pessoais",
-      description: "Informações pessoais e matrícula.",
-      icon: User,
-    },
-    {
-      id: "myclass",
-      title: "Minha Turma",
-      description: "Colegas, professores e detalhes.",
-      icon: Users,
-    },
-    {
-      id: "schedule",
-      title: "Horário",
-      description: "Grade de aulas semanal.",
-      icon: Clock,
-    },
-    {
-      id: "calendar",
-      title: "Calendário Letivo",
-      description: "Provas, feriados e eventos.",
-      icon: Calendar,
-    },
-    {
-      id: "transcript",
-      title: "Boletim",
-      description: "Notas e médias por disciplina.",
-      icon: BarChart3,
-    },
-    {
-      id: "attendance",
-      title: "Frequência",
-      description: "Presenças, faltas e Pé de Meia.",
-      icon: ClipboardList,
-    },
-    {
-      id: "onlineassessments",
-      title: "Avaliações Online",
-      description: "Avaliações disponíveis.",
-      icon: Monitor,
-    },
-    {
-      id: "bio",
-      title: "Ficha Biográfica",
-      description: "Histórico e dados completos.",
-      icon: Heart,
-    },
-    {
-      id: "platforms",
-      title: "Plataformas",
-      description: "Google Classroom, SISEDU e outros.",
-      icon: Link2,
-    },
-    {
-      id: "communications",
-      title: "Comunicados",
-      description: "Avisos da escola.",
-      icon: Bell,
-    },
-    {
-      id: "events",
-      title: "Eventos",
-      description: "Calendário escolar.",
-      icon: CalendarClock,
-    },
-    {
-      id: "tutorial",
-      title: "Tutorial",
-      description: "Como usar o RED.",
-      icon: HelpCircle,
-    },
-  ],
-  guardian: [
-    {
-      id: "overview",
-      title: "Início",
-      description: "Alertas e resumo do filho.",
-      icon: LayoutGrid,
-    },
-    {
-      id: "attendance",
-      title: "Frequência",
-      description: "Faltas e presenças do filho.",
-      icon: ClipboardList,
-    },
-    {
-      id: "grades",
-      title: "Desempenho",
-      description: "Notas do filho.",
-      icon: BookOpenCheck,
-    },
-    {
-      id: "comments",
-      title: "Comentários",
-      description: "Ocorrências com autoria.",
-      icon: MessageSquare,
-    },
-    {
-      id: "communications",
-      title: "Comunicados",
-      description: "Avisos da escola.",
-      icon: Bell,
-    },
-    {
-      id: "events",
-      title: "Eventos",
-      description: "Calendário escolar.",
-      icon: CalendarClock,
-    },
-    {
-      id: "justifications",
-      title: "Justificativas",
-      description: "Justificar faltas do filho.",
-      icon: ShieldCheck,
-    },
-    {
-      id: "news",
-      title: "Notícias",
-      description: "Novidades e reuniões.",
-      icon: Megaphone,
-    },
-    {
-      id: "platforms",
-      title: "Plataformas",
-      description: "Links e acessos parceiros.",
-      icon: Link2,
-    },
-    {
-      id: "tutorial",
-      title: "Tutorial",
-      description: "Como usar o RED.",
-      icon: HelpCircle,
-    },
-  ],
-};
-
-function resolveProfileFromRole(
-  role: string | null | undefined
-): UserProfile | null {
-  if (!role) return null;
-  return PROFILE_BY_ROLE[role] ?? null;
-}
-
-function getFirstSectionId(profile: UserProfile): string {
-  return PROFILE_SECTIONS[profile][0]?.id ?? "overview";
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(" ").filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
-  return (
-    (parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? "")
-  ).toUpperCase();
-}
 
 // ── Lazy-loaded page components ───────────────────────────────────
 // School
@@ -375,17 +77,14 @@ const TeacherCommunications = lazy(
 const StudentOverview = lazy(
   () => import("../app/student/dashboard/StudentDashboard")
 );
-const StudentPersonal = lazy(
-  () => import("../app/student/dashboard/StudentPersonal")
+const StudentProfile = lazy(
+  () => import("../app/student/dashboard/StudentProfile")
 );
 const StudentMyClass = lazy(
   () => import("../app/student/dashboard/StudentMyClass")
 );
-const StudentSchedule = lazy(
-  () => import("../app/student/dashboard/StudentSchedule")
-);
-const StudentCalendar = lazy(
-  () => import("../app/student/dashboard/StudentCalendar")
+const StudentAgenda = lazy(
+  () => import("../app/student/dashboard/StudentAgenda")
 );
 const StudentTranscript = lazy(
   () => import("../app/student/dashboard/StudentTranscript")
@@ -396,15 +95,11 @@ const StudentAttendance = lazy(
 const StudentOnlineAssessments = lazy(
   () => import("../app/student/dashboard/StudentOnlineAssessments")
 );
-const StudentBio = lazy(() => import("../app/student/dashboard/StudentBio"));
-const StudentPlatforms = lazy(
-  () => import("../app/student/dashboard/StudentPlatforms")
+const StudentNotices = lazy(
+  () => import("../app/student/dashboard/StudentNotices")
 );
-const StudentCommunications = lazy(
-  () => import("../app/student/dashboard/StudentCommunications")
-);
-const StudentEvents = lazy(
-  () => import("../app/student/dashboard/StudentEvents")
+const StudentSchedule = lazy(
+  () => import("../app/student/dashboard/StudentSchedule")
 );
 // Guardian
 const GuardianOverview = lazy(
@@ -431,10 +126,6 @@ const GuardianJustifications = lazy(
 const GuardianNews = lazy(
   () => import("../app/guardian/dashboard/GuardianNews")
 );
-const GuardianPlatforms = lazy(
-  () => import("../app/guardian/dashboard/GuardianPlatforms")
-);
-
 function ContentLoader() {
   return (
     <div className="animate-pulse space-y-4 p-4 md:p-6">
@@ -481,28 +172,22 @@ function getSectionComponent(profile: UserProfile, sectionId: string) {
       return TeacherCommunications;
     case "student:overview":
       return StudentOverview;
-    case "student:personal":
-      return StudentPersonal;
+    case "student:profile":
+      return StudentProfile;
     case "student:myclass":
       return StudentMyClass;
-    case "student:schedule":
-      return StudentSchedule;
-    case "student:calendar":
-      return StudentCalendar;
+    case "student:agenda":
+      return StudentAgenda;
     case "student:transcript":
       return StudentTranscript;
     case "student:attendance":
       return StudentAttendance;
     case "student:onlineassessments":
       return StudentOnlineAssessments;
-    case "student:bio":
-      return StudentBio;
-    case "student:platforms":
-      return StudentPlatforms;
-    case "student:communications":
-      return StudentCommunications;
-    case "student:events":
-      return StudentEvents;
+    case "student:notices":
+      return StudentNotices;
+    case "student:schedule":
+      return StudentSchedule;
     case "guardian:overview":
       return GuardianOverview;
     case "guardian:attendance":
@@ -519,8 +204,6 @@ function getSectionComponent(profile: UserProfile, sectionId: string) {
       return GuardianJustifications;
     case "guardian:news":
       return GuardianNews;
-    case "guardian:platforms":
-      return GuardianPlatforms;
     default:
       return null;
   }
@@ -782,15 +465,19 @@ export default function DashboardShell() {
 
   const profile = useMemo(() => {
     if (!user) return null;
-    return (
-      resolveProfileFromRole(user.role) ??
-      (isUserProfile((user as RegistryRow).defaultProfile as string)
-        ? ((user as RegistryRow).defaultProfile as UserProfile)
-        : "school")
-    );
+
+    const fromRole = resolveProfileFromRole(user.role);
+    if (fromRole) return fromRole;
+
+    if (isUserProfile(user.defaultProfile)) {
+      return user.defaultProfile;
+    }
+
+    // role "user" or unknown — no valid profile, redirect to login
+    return null;
   }, [user]);
 
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string>("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return (
@@ -806,8 +493,9 @@ export default function DashboardShell() {
   }, [profile]);
 
   useEffect(() => {
-    if (!loading && !user) navigate("/login");
-  }, [loading, user, navigate]);
+    if (loading) return;
+    if (!user || !profile) navigate("/login");
+  }, [loading, user, profile, navigate]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -831,10 +519,18 @@ export default function DashboardShell() {
   const SectionComponent = activeSection
     ? getSectionComponent(profile, activeSection)
     : null;
+
   const profileConfig = getProfileConfig(profile);
   const currentSection = sections.find(s => s.id === activeSection) ?? null;
 
-  const userName = ((user as RegistryRow).name as string) ?? "Usuário";
+  const emailPrefix = user.email?.split("@")[0] ?? null;
+  const emailName = emailPrefix
+    ? emailPrefix
+        .split(/[._-]/)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ")
+    : null;
+  const userName = user.name || emailName || "Usuário";
   const userFirstName = userName.split(" ")[0] ?? "Usuário";
   const userInitials = getInitials(userName);
   const accentGradient = PROFILE_ACCENT[profile];
@@ -846,31 +542,22 @@ export default function DashboardShell() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(139,17,32,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(31,58,95,0.09),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.14),transparent_24%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(139,17,32,0.14),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(31,58,95,0.12),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_24%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(139,17,32,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(31,58,95,0.03)_1px,transparent_1px)] bg-[size:72px_72px] opacity-70" />
 
-      {/* ── Fixed layout wrapper (header + sidebar + main) ── */}
       <div className="relative flex h-full flex-col">
-        {/* ── Header (fixed) ── */}
+        {/* HEADER */}
         <header className="relative z-40 shrink-0 border-b border-border bg-card/95 backdrop-blur">
           <div className="flex h-16 items-center justify-between gap-4 px-4 md:px-6">
-            {/* Left: hamburger (mobile) + logo + welcome info */}
             <div className="flex min-w-0 items-center gap-3">
-              {/* Mobile hamburger */}
               <button
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card transition-colors hover:bg-muted/50 md:hidden"
                 onClick={() => setMobileMenuOpen(true)}
-                aria-label="Menu"
               >
                 <svg
+                  viewBox="0 0 24 24"
                   className="size-4"
                   fill="none"
                   stroke="currentColor"
-                  viewBox="0 0 24 24"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
+                  <path d="M4 6h16M4 12h16M4 18h16" strokeWidth={2} />
                 </svg>
               </button>
 
@@ -882,9 +569,6 @@ export default function DashboardShell() {
 
               {/* Welcome info (merged from welcome card) */}
               <div className="hidden min-w-0 md:block">
-                <p className="truncate font-heading text-sm font-semibold text-foreground leading-tight">
-                  Olá, {userFirstName}.
-                </p>
                 <p className="truncate font-body text-xs text-muted-foreground leading-tight">
                   {profileConfig.title}
                   {currentSection ? ` · ${currentSection.title}` : ""}
@@ -1060,8 +744,8 @@ export default function DashboardShell() {
 
           {/* ── Main scrollable area ── */}
           <main className="min-w-0 flex-1 overflow-y-auto pb-20 md:pb-4">
-            {/* Mobile: profile pill + horizontal scroll tabs */}
-            <div className="space-y-2 px-4 pt-4 md:hidden">
+            {/* Mobile: profile pill with name */}
+            <div className="px-4 pt-4 md:hidden">
               <div
                 className={`inline-flex items-center gap-2 rounded-lg bg-gradient-to-r ${accentGradient} px-3 py-1.5`}
               >
@@ -1069,29 +753,11 @@ export default function DashboardShell() {
                   {userInitials}
                 </div>
                 <span className="font-heading text-xs font-semibold text-white">
-                  {profileConfig.title}
+                  {userFirstName}
                 </span>
-              </div>
-              <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 scrollbar-hide">
-                {sections.map(section => {
-                  const Icon = section.icon;
-                  const isActive = activeSection === section.id;
-                  return (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => setActiveSection(section.id)}
-                      className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-heading font-medium transition-colors ${
-                        isActive
-                          ? "border-red-brand bg-red-brand text-white"
-                          : "border-border bg-card text-muted-foreground hover:bg-muted/50"
-                      }`}
-                    >
-                      <Icon size={12} />
-                      {section.title}
-                    </button>
-                  );
-                })}
+                <span className="font-body text-[10px] text-white/70">
+                  · {profileConfig.title}
+                </span>
               </div>
             </div>
 
@@ -1252,4 +918,4 @@ export default function DashboardShell() {
   );
 }
 
-export type { DashboardSection, RegistryRow };
+export type { DashboardSection };

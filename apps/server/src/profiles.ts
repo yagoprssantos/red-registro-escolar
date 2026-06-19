@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "./core/trpc";
 import {
+  getEntityById,
   getGuardianProfile,
   getGuardianStudentPerformance,
   getGuardianStudents,
@@ -17,6 +18,7 @@ import {
   getTeacherClassGrades,
   getTeacherClasses,
   getTeacherProfile,
+  listEntityRows,
   listNotificationsForUser,
 } from "./db";
 
@@ -125,6 +127,158 @@ export const profilesRouter = router({
         if (!student) return [];
         return await getScheduleSlots(student.schoolId as number, input.shift);
       }),
+
+    classDetails: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user)
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não autenticado" });
+
+      const student = await getStudentProfile(ctx.user.id);
+      if (!student) return null;
+
+      const enrollments = await listEntityRows("classEnrollments", {
+        filters: { studentId: student.id as number, status: "ativo" },
+        limit: 1,
+      });
+      if (!enrollments.length) return null;
+
+      const classId = enrollments[0].classId as number;
+
+      const [cls, classmateEnrollments, classSubjects] = await Promise.all([
+        getEntityById("classes", classId),
+        listEntityRows("classEnrollments", {
+          filters: { classId, status: "ativo" },
+          limit: 60,
+        }),
+        listEntityRows("classSubjects", { filters: { classId }, limit: 30 }),
+      ]);
+
+      const classmateIds = (classmateEnrollments as Array<Record<string, unknown>>)
+        .map(e => e.studentId as number)
+        .filter(id => id != null && id !== (student.id as number));
+
+      const csIds = (classSubjects as Array<Record<string, unknown>>).map(cs => cs.id as number);
+      const subjectIds = (classSubjects as Array<Record<string, unknown>>).map(cs => cs.subjectId as number);
+
+      const [classmates, subjectDefs, classTeachers] = await Promise.all([
+        classmateIds.length > 0
+          ? listEntityRows("students", { filters: { id: classmateIds }, limit: classmateIds.length })
+          : Promise.resolve([]),
+        subjectIds.length > 0
+          ? listEntityRows("subjects", { filters: { id: subjectIds }, limit: subjectIds.length })
+          : Promise.resolve([]),
+        csIds.length > 0
+          ? listEntityRows("classTeachers", { filters: { classSubjectId: csIds }, limit: csIds.length })
+          : Promise.resolve([]),
+      ]);
+
+      const teacherIds = Array.from(
+        new Set((classTeachers as Array<Record<string, unknown>>).map(ct => ct.teacherId as number))
+      );
+      const teachers = teacherIds.length > 0
+        ? await listEntityRows("teachers", { filters: { id: teacherIds }, limit: teacherIds.length })
+        : [];
+
+      return {
+        class: cls,
+        classmates: (classmates as Array<Record<string, unknown>>).map(s => ({
+          id: s.id as number,
+          name: s.name as string,
+        })),
+        subjects: (classSubjects as Array<Record<string, unknown>>).map(cs => {
+          const subDef = (subjectDefs as Array<Record<string, unknown>>).find(s => s.id === cs.subjectId);
+          const ct = (classTeachers as Array<Record<string, unknown>>).find(c => c.classSubjectId === cs.id);
+          const teacher = ct
+            ? (teachers as Array<Record<string, unknown>>).find(t => t.id === ct.teacherId)
+            : null;
+          return {
+            id: cs.id as number,
+            subjectId: cs.subjectId as number,
+            subjectName: (subDef?.name as string) ?? "—",
+            teacherName: (teacher?.name as string) ?? null,
+          };
+        }),
+      };
+    }),
+
+    guardians: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user)
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não autenticado" });
+
+      const student = await getStudentProfile(ctx.user.id);
+      if (!student) return [];
+
+      const links = await listEntityRows("studentGuardians", {
+        filters: { studentId: student.id as number },
+        limit: 10,
+      });
+      if (!links.length) return [];
+
+      const guardianIds = (links as Array<Record<string, unknown>>).map(l => l.guardianId as number);
+      const guardians = await listEntityRows("guardians", {
+        filters: { id: guardianIds },
+        limit: guardianIds.length,
+      });
+
+      return (guardians as Array<Record<string, unknown>>).map(g => ({
+        id: g.id as number,
+        name: g.name as string,
+        email: g.email as string | null,
+        phone: g.phone as string | null,
+        relationship: ((links as Array<Record<string, unknown>>).find(l => l.guardianId === g.id)?.relationship as string) ?? null,
+      }));
+    }),
+
+    attendanceDetail: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user)
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não autenticado" });
+
+      const student = await getStudentProfile(ctx.user.id);
+      if (!student) return [];
+
+      const records = await listEntityRows("attendanceRecords", {
+        filters: { studentId: student.id as number },
+        limit: 500,
+      });
+      if (!records.length) return [];
+
+      const sessionIds = Array.from(
+        new Set((records as Array<Record<string, unknown>>).map(r => r.classSessionId as number))
+      );
+      const sessions = sessionIds.length > 0
+        ? await listEntityRows("classSessions", { filters: { id: sessionIds }, limit: sessionIds.length })
+        : [];
+
+      const csIds = Array.from(
+        new Set((sessions as Array<Record<string, unknown>>).map(s => s.classSubjectId as number))
+      );
+      const classSubjects = csIds.length > 0
+        ? await listEntityRows("classSubjects", { filters: { id: csIds }, limit: csIds.length })
+        : [];
+
+      const subjectIds = Array.from(
+        new Set((classSubjects as Array<Record<string, unknown>>).map(cs => cs.subjectId as number))
+      );
+      const subjects = subjectIds.length > 0
+        ? await listEntityRows("subjects", { filters: { id: subjectIds }, limit: subjectIds.length })
+        : [];
+
+      const sessionMap = new Map((sessions as Array<Record<string, unknown>>).map(s => [s.id as number, s]));
+      const csMap = new Map((classSubjects as Array<Record<string, unknown>>).map(cs => [cs.id as number, cs]));
+      const subjectMap = new Map((subjects as Array<Record<string, unknown>>).map(s => [s.id as number, s]));
+
+      return (records as Array<Record<string, unknown>>).map(r => {
+        const session = sessionMap.get(r.classSessionId as number);
+        const cs = session ? csMap.get(session.classSubjectId as number) : null;
+        const subject = cs ? subjectMap.get(cs.subjectId as number) : null;
+        return {
+          id: r.id as number,
+          status: r.status as "present" | "absent" | "justified",
+          date: (session?.lessonDate as string) ?? "",
+          subject: (subject?.name as string) ?? "—",
+          subjectId: (cs?.subjectId as number) ?? null,
+        };
+      });
+    }),
 
     notifications: protectedProcedure
       .input(z.object({

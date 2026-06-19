@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { AlertTriangle, Download, GraduationCap, Search } from "lucide-react";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 type ReportTab = "frequency" | "performance" | "comments";
 
@@ -16,7 +16,7 @@ const TABS: { value: ReportTab; label: string }[] = [
 
 export default function SchoolReports() {
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+  const schoolId = mySchools?.[0]?.schoolId;
 
   const [tab, setTab] = useState<ReportTab>("frequency");
   const [classFilter, setClassFilter] = useState<string>("all");
@@ -128,6 +128,16 @@ export default function SchoolReports() {
     return score < 5;
   });
 
+  const averageAttendance =
+    attendanceRecords.length > 0
+      ? (
+          attendanceRecords.reduce((acc, r) => {
+            const rate = Number(r.attendanceRate ?? r.presenceRate ?? 0);
+            return acc + rate;
+          }, 0) / attendanceRecords.length
+        ).toFixed(1)
+      : null;
+
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-semibold">Relatórios</h2>
@@ -199,7 +209,7 @@ export default function SchoolReports() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  {attendanceReport?.averageAttendance ?? "—"}%
+                  {averageAttendance ?? "—"}%{" "}
                 </div>
               </CardContent>
             </Card>

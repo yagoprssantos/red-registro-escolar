@@ -29,26 +29,54 @@ export const schoolRouter = router({
 
       const today = input.date || new Date().toISOString().split("T")[0];
 
-      // 1. Attendance today
-      const sessions = await listEntityRows("classSessions", {
-        filters: { lessonDate: today },
+      // 1. Load all classes for this school (base for all subsequent queries)
+      const schoolClasses = await listEntityRows("classes", {
+        filters: { schoolId: input.schoolId },
         limit: 500,
       });
-      const sessionIds = sessions.map(
-        (s: Record<string, unknown>) => s.id as number
+      const classIds = schoolClasses.map(
+        (c: Record<string, unknown>) => c.id as number
       );
 
+      const emptyResult = {
+        attendanceToday: { presentCount: 0, absentCount: 0, totalExpected: 0, percentage: 0 },
+        studentsAtRisk: [],
+        pendingJustifications: 0,
+        upcomingEvents: [],
+      };
+
+      if (classIds.length === 0) return emptyResult;
+
+      // 2. Get classSubjects for those classes
+      const classSubjects = await listEntityRows("classSubjects", {
+        filters: { classId: classIds },
+        limit: 1000,
+      });
+      const csIds = classSubjects.map(
+        (cs: Record<string, unknown>) => cs.id as number
+      );
+
+      // 3. Attendance today — sessions for today filtered by school's classSubjects
       let presentCount = 0;
       let absentCount = 0;
       let totalExpected = 0;
 
-      if (sessionIds.length > 0) {
-        const records = await listEntityRows("attendanceRecords", {
-          limit: 2000,
+      if (csIds.length > 0) {
+        const sessions = await listEntityRows("classSessions", {
+          filters: { lessonDate: today, classSubjectId: csIds },
+          limit: 500,
         });
-        for (const r of records) {
-          const rr = r as Record<string, unknown>;
-          if (sessionIds.includes(rr.classSessionId as number)) {
+        const sessionIds = sessions.map(
+          (s: Record<string, unknown>) => s.id as number
+        );
+
+        if (sessionIds.length > 0) {
+          const records = await listEntityRows("attendanceRecords", {
+            filters: { classSessionId: sessionIds },
+            limit: 2000,
+          });
+          for (const r of records) {
+            const rr = r as Record<string, unknown>;
             totalExpected++;
             if (rr.status === "present") presentCount++;
             else if (rr.status === "absent") absentCount++;
@@ -66,25 +94,17 @@ export const schoolRouter = router({
             : 0,
       };
 
-      // 2. Students at risk (>25% absence rate)
+      // 4. Students at risk — batch fetch enrollments and attendance
       const enrollments = await listEntityRows("classEnrollments", {
-        filters: { status: "ativo" },
+        filters: { classId: classIds, status: "ativo" },
         limit: 500,
       });
-      const schoolEnrollmentIds = new Set<number>();
 
-      // Filter enrollments by school
-      for (const e of enrollments) {
-        const er = e as Record<string, unknown>;
-        const classId = er.classId as number;
-        const cls = await getEntityById("classes", classId);
-        if (
-          cls &&
-          (cls as Record<string, unknown>).schoolId === input.schoolId
-        ) {
-          schoolEnrollmentIds.add(er.studentId as number);
-        }
-      }
+      const studentIds = Array.from(
+        new Set(
+          enrollments.map((e: Record<string, unknown>) => e.studentId as number)
+        )
+      );
 
       const studentsAtRisk: Array<{
         studentId: number;
@@ -94,68 +114,74 @@ export const schoolRouter = router({
         totalAbsences: number;
       }> = [];
 
-      // Get all attendance records for these students
-      const allRecords = await listEntityRows("attendanceRecords", {
-        limit: 5000,
-      });
-      const studentAbsences: Record<
-        number,
-        { total: number; absences: number }
-      > = {};
+      if (studentIds.length > 0) {
+        const allRecords = await listEntityRows("attendanceRecords", {
+          filters: { studentId: studentIds },
+          limit: 5000,
+        });
 
-      for (const r of allRecords) {
-        const rr = r as Record<string, unknown>;
-        const studentId = rr.studentId as number;
-        if (schoolEnrollmentIds.has(studentId)) {
-          if (!studentAbsences[studentId])
-            studentAbsences[studentId] = { total: 0, absences: 0 };
-          studentAbsences[studentId].total++;
-          if (rr.status === "absent") studentAbsences[studentId].absences++;
+        const studentAbsences: Record<
+          number,
+          { total: number; absences: number }
+        > = {};
+        for (const r of allRecords) {
+          const rr = r as Record<string, unknown>;
+          const sid = rr.studentId as number;
+          if (!studentAbsences[sid])
+            studentAbsences[sid] = { total: 0, absences: 0 };
+          studentAbsences[sid].total++;
+          if (rr.status === "absent") studentAbsences[sid].absences++;
         }
-      }
 
-      for (const [studentIdStr, data] of Object.entries(studentAbsences)) {
-        const studentId = Number(studentIdStr);
-        const rate = data.total > 0 ? data.absences / data.total : 0;
-        if (rate > 0.25) {
-          const student = await getEntityById("students", studentId);
-          const studentName = student
-            ? ((student as Record<string, unknown>).name as string)
-            : "Desconhecido";
-          // Find class
-          const studentEnrollments = enrollments.filter(
-            (e: Record<string, unknown>) =>
-              (e.studentId as number) === studentId
-          );
-          const className =
-            studentEnrollments.length > 0
-              ? ((
-                  (await getEntityById(
-                    "classes",
-                    (studentEnrollments[0] as Record<string, unknown>)
-                      .classId as number
-                  )) as Record<string, unknown>
-                )?.name as string) || "?"
-              : "?";
+        const atRiskIds = Object.entries(studentAbsences)
+          .filter(([, d]) => d.total > 0 && d.absences / d.total > 0.25)
+          .map(([id]) => Number(id));
 
-          studentsAtRisk.push({
-            studentId,
-            studentName,
-            className,
-            absenceRate: Math.round(rate * 100),
-            totalAbsences: data.absences,
+        if (atRiskIds.length > 0) {
+          const atRiskStudents = await listEntityRows("students", {
+            filters: { id: atRiskIds },
+            limit: atRiskIds.length,
           });
+
+          // Build class lookup from enrollments + schoolClasses already loaded
+          const classMap = new Map(
+            schoolClasses.map((c: Record<string, unknown>) => [
+              c.id as number,
+              c.name as string,
+            ])
+          );
+          const enrollMap = new Map(
+            enrollments.map((e: Record<string, unknown>) => [
+              e.studentId as number,
+              e.classId as number,
+            ])
+          );
+
+          for (const s of atRiskStudents) {
+            const sr = s as Record<string, unknown>;
+            const sid = sr.id as number;
+            const classId = enrollMap.get(sid);
+            const className = classId ? (classMap.get(classId) ?? "?") : "?";
+            const data = studentAbsences[sid];
+            studentsAtRisk.push({
+              studentId: sid,
+              studentName: sr.name as string,
+              className,
+              absenceRate: Math.round((data.absences / data.total) * 100),
+              totalAbsences: data.absences,
+            });
+          }
         }
       }
 
-      // 3. Pending justifications
+      // 5. Pending justifications
       const justifications = await listEntityRows("absenceJustifications", {
         filters: { schoolId: input.schoolId, status: "pending" },
         limit: 100,
       });
       const pendingJustifications = justifications.length;
 
-      // 4. Upcoming events
+      // 6. Upcoming events
       const events = await listEntityRows("schoolEvents", {
         filters: { schoolId: input.schoolId },
         limit: 10,
@@ -179,7 +205,7 @@ export const schoolRouter = router({
       };
     }),
 
-  // Attendance report
+  // Attendance report filtered by school
   attendanceReport: protectedProcedure
     .input(
       z.object({
@@ -200,13 +226,44 @@ export const schoolRouter = router({
         });
       }
 
+      const classFilters: Record<string, unknown> = { schoolId: input.schoolId };
+      if (input.classId) classFilters.id = input.classId;
+
+      const schoolClasses = await listEntityRows("classes", {
+        filters: classFilters as Record<string, string | number | boolean | null | undefined>,
+        limit: 500,
+      });
+      const classIds = schoolClasses.map(
+        (c: Record<string, unknown>) => c.id as number
+      );
+      if (!classIds.length) return { totalRecords: 0, records: [] };
+
+      const classSubjects = await listEntityRows("classSubjects", {
+        filters: { classId: classIds },
+        limit: 1000,
+      });
+      const csIds = classSubjects.map(
+        (cs: Record<string, unknown>) => cs.id as number
+      );
+      if (!csIds.length) return { totalRecords: 0, records: [] };
+
+      const sessions = await listEntityRows("classSessions", {
+        filters: { classSubjectId: csIds },
+        limit: 2000,
+      });
+      const sessionIds = sessions.map(
+        (s: Record<string, unknown>) => s.id as number
+      );
+      if (!sessionIds.length) return { totalRecords: 0, records: [] };
+
       const records = await listEntityRows("attendanceRecords", {
+        filters: { classSessionId: sessionIds },
         limit: 5000,
       });
       return { totalRecords: records.length, records };
     }),
 
-  // Grades report
+  // Grades report filtered by school
   gradesReport: protectedProcedure
     .input(
       z.object({
@@ -225,9 +282,41 @@ export const schoolRouter = router({
         });
       }
 
-      const scores = await listEntityRows("assessmentScores", { limit: 5000 });
+      const classFilters: Record<string, unknown> = { schoolId: input.schoolId };
+      if (input.classId) classFilters.id = input.classId;
 
-      // Calculate average
+      const schoolClasses = await listEntityRows("classes", {
+        filters: classFilters as Record<string, string | number | boolean | null | undefined>,
+        limit: 500,
+      });
+      const classIds = schoolClasses.map(
+        (c: Record<string, unknown>) => c.id as number
+      );
+      if (!classIds.length) return { totalScores: 0, scores: [], averageScore: "—" };
+
+      const classSubjects = await listEntityRows("classSubjects", {
+        filters: { classId: classIds },
+        limit: 1000,
+      });
+      const csIds = classSubjects.map(
+        (cs: Record<string, unknown>) => cs.id as number
+      );
+      if (!csIds.length) return { totalScores: 0, scores: [], averageScore: "—" };
+
+      const assessments = await listEntityRows("assessments", {
+        filters: { classSubjectId: csIds },
+        limit: 500,
+      });
+      const assessmentIds = assessments.map(
+        (a: Record<string, unknown>) => a.id as number
+      );
+      if (!assessmentIds.length) return { totalScores: 0, scores: [], averageScore: "—" };
+
+      const scores = await listEntityRows("assessmentScores", {
+        filters: { assessmentId: assessmentIds },
+        limit: 5000,
+      });
+
       const validScores = scores
         .map((s: Record<string, unknown>) => Number(s.score || 0))
         .filter((s: number) => Number.isFinite(s));
@@ -240,6 +329,35 @@ export const schoolRouter = router({
           : "—";
 
       return { totalScores: scores.length, scores, averageScore };
+    }),
+
+  // Users linked to a school (via userSchools)
+  users: protectedProcedure
+    .input(z.object({ schoolId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      if (
+        !ctx.user ||
+        (ctx.user.role !== "admin" && ctx.user.role !== "school_staff")
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Acesso restrito à gestão escolar",
+        });
+      }
+
+      const userSchools = await listEntityRows("userSchools", {
+        filters: { schoolId: input.schoolId },
+        limit: 500,
+      });
+      const userIds = userSchools.map(
+        (us: Record<string, unknown>) => us.userId as number
+      );
+      if (!userIds.length) return [];
+
+      return await listEntityRows("users", {
+        filters: { id: userIds },
+        limit: userIds.length,
+      });
     }),
 
   // LGPD Export — student data (Art. 18)
@@ -309,20 +427,16 @@ export const schoolRouter = router({
       })) as Record<string, unknown>[];
 
       // Attendance records
-      const attendanceRecords = (await listEntityRows("attendanceRecords", {
+      const studentAttendance = (await listEntityRows("attendanceRecords", {
+        filters: { studentId: input.studentId },
         limit: 5000,
       })) as Record<string, unknown>[];
-      const studentAttendance = attendanceRecords.filter(
-        r => (r.studentId as number) === input.studentId
-      );
 
       // Grade scores
-      const assessmentScores = (await listEntityRows("assessmentScores", {
+      const studentGrades = (await listEntityRows("assessmentScores", {
+        filters: { studentId: input.studentId },
         limit: 5000,
       })) as Record<string, unknown>[];
-      const studentGrades = assessmentScores.filter(
-        s => (s.studentId as number) === input.studentId
-      );
 
       // Comments
       const comments = (await listEntityRows("studentComments", {
@@ -330,20 +444,22 @@ export const schoolRouter = router({
         limit: 500,
       })) as Record<string, unknown>[];
 
-      // Guardian data of requester
+      // Guardian links
       const guardianLinks = (await listEntityRows("studentGuardians", {
         filters: { studentId: input.studentId },
         limit: 10,
       })) as Record<string, unknown>[];
 
-      const guardianDetails = [];
-      for (const link of guardianLinks) {
-        const guardian = await getEntityById(
-          "guardians",
-          link.guardianId as number
-        );
-        if (guardian) guardianDetails.push(guardian);
-      }
+      const guardianIds = guardianLinks.map(
+        (l) => (l as Record<string, unknown>).guardianId as number
+      );
+      const guardianDetails =
+        guardianIds.length > 0
+          ? await listEntityRows("guardians", {
+              filters: { id: guardianIds },
+              limit: guardianIds.length,
+            })
+          : [];
 
       // Audit this access
       try {

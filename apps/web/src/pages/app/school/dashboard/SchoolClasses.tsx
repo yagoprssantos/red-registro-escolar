@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import {
   ChevronDown,
   ChevronUp,
@@ -12,7 +13,6 @@ import {
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const SHIFT_LABELS: Record<string, string> = {
   morning: "Manhã",
@@ -23,7 +23,7 @@ const SHIFT_LABELS: Record<string, string> = {
 
 export default function SchoolClasses() {
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+  const schoolId = mySchools?.[0]?.schoolId;
 
   const { data: classes } = trpc.registry.list.useQuery(
     {

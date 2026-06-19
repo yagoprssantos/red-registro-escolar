@@ -1,13 +1,26 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import {
+  AlertTriangle,
   Bell,
   BookOpenCheck,
+  CalendarClock,
+  CheckCircle2,
   ClipboardList,
   FileText,
+  TrendingDown,
   Users,
 } from "lucide-react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
+
+const renderSafe = (value: unknown): React.ReactNode => {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value ? "Sim" : "Não";
+  return String(value);
+};
 
 export default function TeacherDashboard() {
   const { data: teacherProfile } = trpc.profiles.teacher.me.useQuery();
@@ -17,7 +30,7 @@ export default function TeacherDashboard() {
     limit: 10,
   });
   const { data: myComments } = trpc.comments.byTeacher.useQuery(
-    { teacherId: ((teacherProfile as RegistryRow)?.id as number) ?? 0 },
+    { teacherId: teacherProfile?.id ?? 0 },
     { enabled: !!teacherProfile }
   );
   const { data: assessments } = trpc.registry.list.useQuery(
@@ -35,7 +48,7 @@ export default function TeacherDashboard() {
   const notifList = (notifications ?? []) as RegistryRow[];
   const assessmentList = (assessments ?? []) as RegistryRow[];
 
-  // Check which classes have attendance today
+  // ── Today's sessions ──────────────────────────────────────────────────────
   const today = new Date().toISOString().split("T")[0];
   const { data: todaySessions } = trpc.registry.list.useQuery(
     {
@@ -49,16 +62,67 @@ export default function TeacherDashboard() {
   const classesWithSessionToday = new Set(
     sessionList.map(s => s.classSubjectId as number)
   );
-
-  // Classes without today's session = "pending attendance"
   const pendingAttendance = classList.filter(
     cls => !classesWithSessionToday.has(cls.id as number)
-  ).length;
+  );
+
+  // ── Classes with most absences (recent 30 days) ───────────────────────────
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+  const { data: recentAbsences } = trpc.registry.list.useQuery(
+    {
+      entity: "attendanceRecords" as const,
+      filters: { present: false, dateFrom: thirtyDaysAgo },
+      limit: 500,
+    },
+    { enabled: classList.length > 0 }
+  );
+  const absenceList = (recentAbsences ?? []) as RegistryRow[];
+
+  // Count absences per classSubjectId and map to class name
+  const absencesByClass = absenceList.reduce<Record<number, number>>(
+    (acc, a) => {
+      const id = a.classSubjectId as number;
+      acc[id] = (acc[id] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const topAbsenteeClasses = classList
+    .map(cls => ({
+      id: cls.id as number,
+      name: String(cls.name || cls.gradeLabel || "Turma"),
+      absences: absencesByClass[cls.id as number] ?? 0,
+    }))
+    .filter(c => c.absences > 0)
+    .sort((a, b) => b.absences - a.absences)
+    .slice(0, 3);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const shiftLabel = (shift: unknown) =>
+    shift === "morning"
+      ? "Manhã"
+      : shift === "afternoon"
+        ? "Tarde"
+        : shift === "evening"
+          ? "Noite"
+          : "Integral";
+
+  const categoryIcon = (cat: string) =>
+    cat === "elogio"
+      ? "⭐"
+      : cat === "melhoria"
+        ? "🔄"
+        : cat === "ocorrencia"
+          ? "⚠️"
+          : "💬";
 
   return (
     <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ── Top stat cards ─────────────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Total turmas */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Minhas turmas</CardTitle>
@@ -66,51 +130,68 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{classList.length}</div>
+            <p className="text-xs text-muted-foreground">turmas vinculadas</p>
           </CardContent>
         </Card>
 
-        <Card className={pendingAttendance > 0 ? "border-amber-200" : ""}>
+        {/* Chamadas pendentes
+        <Card
+          className={
+            pendingAttendance.length > 0
+              ? "border-amber-300 dark:border-amber-700"
+              : ""
+          }
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">
               Chamadas pendentes
             </CardTitle>
-            <ClipboardList
-              className={
-                pendingAttendance > 0
-                  ? "size-4 text-amber-500"
-                  : "size-4 text-green-500"
-              }
-            />
+            {pendingAttendance.length > 0 ? (
+              <ClipboardList className="size-4 text-amber-500" />
+            ) : (
+              <CheckCircle2 className="size-4 text-green-500" />
+            )}
           </CardHeader>
           <CardContent>
             <div
               className={`text-2xl font-bold ${
-                pendingAttendance > 0 ? "text-amber-600" : "text-green-600"
+                pendingAttendance.length > 0
+                  ? "text-amber-600"
+                  : "text-green-600"
               }`}
             >
-              {pendingAttendance}
+              {pendingAttendance.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              {pendingAttendance > 0
-                ? "Turmas sem chamada hoje"
+              {pendingAttendance.length > 0
+                ? "turma(s) sem chamada hoje"
                 : "Todas as chamadas registradas"}
+            </p>
+          </CardContent>
+        </Card> */}
+
+        {/* Últimas notas */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">
+              Avaliações lançadas
+            </CardTitle>
+            <BookOpenCheck className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{assessmentList.length}</div>
+            <p className="text-xs text-muted-foreground">
+              últimas 10 avaliações
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">
-              Comentários recentes
-            </CardTitle>
-            <FileText className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{commentList.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className={notifList.length > 0 ? "border-amber-200" : ""}>
+        {/* Comunicados não lidos */}
+        <Card
+          className={
+            notifList.length > 0 ? "border-amber-300 dark:border-amber-700" : ""
+          }
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">
               Comunicados não lidos
@@ -124,39 +205,46 @@ export default function TeacherDashboard() {
             />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{notifList.length}</div>
+            <div
+              className={`text-2xl font-bold ${
+                notifList.length > 0 ? "text-amber-600" : ""
+              }`}
+            >
+              {notifList.length}
+            </div>
+            <p className="text-xs text-muted-foreground">avisos pendentes</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick actions */}
+      {/* ── Quick actions ───────────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-3">
         <button className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-950">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-950">
             <ClipboardList className="size-5" />
           </div>
           <div>
             <p className="text-sm font-medium">Fazer chamada</p>
             <p className="text-xs text-muted-foreground">
-              {pendingAttendance > 0
-                ? `${pendingAttendance} turma(s) pendente(s)`
-                : "Nenhuma pendência"}
+              {pendingAttendance.length > 0
+                ? `${pendingAttendance.length} turma(s) pendente(s)`
+                : "Nenhuma pendência hoje"}
             </p>
           </div>
         </button>
         <button className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950">
             <BookOpenCheck className="size-5" />
           </div>
           <div>
             <p className="text-sm font-medium">Lançar notas</p>
             <p className="text-xs text-muted-foreground">
-              {assessmentList.length} avaliação(ões)
+              {assessmentList.length} avaliação(ões) recentes
             </p>
           </div>
         </button>
         <button className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-950">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-950">
             <FileText className="size-5" />
           </div>
           <div>
@@ -168,95 +256,244 @@ export default function TeacherDashboard() {
         </button>
       </div>
 
-      {/* My classes */}
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-foreground">
-          Minhas turmas
-        </h3>
-        {classList.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma turma vinculada
-          </p>
-        )}
-        <div className="space-y-2">
-          {classList.map(cls => (
-            <div
-              key={String(cls.id)}
-              className="flex items-center justify-between rounded-lg border bg-card px-4 py-3"
-            >
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {String(cls.name || cls.gradeLabel)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {String(
-                    cls.shift === "morning"
-                      ? "Manhã"
-                      : cls.shift === "afternoon"
-                        ? "Tarde"
-                        : cls.shift === "evening"
-                          ? "Noite"
-                          : "Integral"
-                  )}
-                  · Série {String(cls.gradeLabel || "—")}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="size-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
-                  {String(cls.studentCount || "—")}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* ── Two-column section: Próximas aulas + Turmas com mais faltas ──── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Próximas aulas do dia */}
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <CalendarClock className="size-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">
+              Aulas de hoje
+            </h3>
+            <Badge variant="secondary" className="ml-auto">
+              {today.split("-").reverse().join("/")}
+            </Badge>
+          </div>
 
-      {/* Recent comments */}
-      {commentList.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-foreground">
-            Últimos comentários
-          </h3>
-          <div className="space-y-2">
-            {commentList.slice(0, 5).map(c => {
-              const cat = String(c.category);
-              return (
+          {classList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma turma vinculada
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {classList.map(cls => {
+                const hasSession = classesWithSessionToday.has(
+                  cls.id as number
+                );
+                return (
+                  <div
+                    key={String(cls.id)}
+                    className="flex items-center justify-between rounded-lg border bg-card px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {String(cls.name || cls.gradeLabel)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {shiftLabel(cls.shift)} ·{" "}
+                        {String(cls.gradeLabel || "—")}
+                      </p>
+                    </div>
+                    <div className="ml-3 flex items-center gap-2">
+                      <Users className="size-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">
+                        {String(cls.studentCount || "—")}
+                      </span>
+                      {hasSession ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400"
+                        >
+                          Chamada feita
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+                        >
+                          Pendente
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Turmas com mais faltas recentes */}
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingDown className="size-4 text-red-500" />
+            <h3 className="text-sm font-semibold text-foreground">
+              Mais faltas — últimos 30 dias
+            </h3>
+          </div>
+
+          {topAbsenteeClasses.length === 0 ? (
+            <div className="rounded-lg border bg-card px-4 py-6 text-center">
+              <CheckCircle2 className="mx-auto mb-2 size-6 text-green-500" />
+              <p className="text-sm text-muted-foreground">
+                Sem faltas registradas nos últimos 30 dias
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {topAbsenteeClasses.map((cls, idx) => (
                 <div
-                  key={String(c.id)}
-                  className="rounded-lg border bg-card px-4 py-3"
+                  key={cls.id}
+                  className="flex items-center justify-between rounded-lg border bg-card px-4 py-3"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">
-                      {cat === "elogio"
-                        ? "⭐"
-                        : cat === "melhoria"
-                          ? "🔄"
-                          : cat === "ocorrencia"
-                            ? "⚠️"
-                            : "💬"}
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`flex size-6 items-center justify-center rounded-full text-xs font-bold ${
+                        idx === 0
+                          ? "bg-red-100 text-red-600 dark:bg-red-950"
+                          : idx === 1
+                            ? "bg-orange-100 text-orange-600 dark:bg-orange-950"
+                            : "bg-amber-100 text-amber-600 dark:bg-amber-950"
+                      }`}
+                    >
+                      {idx + 1}
                     </span>
-                    <span className="text-xs font-medium capitalize text-muted-foreground">
-                      {cat}
+                    <p className="text-sm font-medium text-foreground">
+                      {cls.name}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="size-3.5 text-red-400" />
+                    <span className="text-sm font-semibold text-red-600">
+                      {cls.absences}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {c.createdAt
-                        ? new Date(String(c.createdAt)).toLocaleDateString(
-                            "pt-BR"
-                          )
-                        : ""}
+                      falta(s)
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-foreground">
-                    {String(c.content).substring(0, 100)}
-                    {String(c.content).length > 100 ? "..." : ""}
-                  </p>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* ── Últimas notas lançadas ──────────────────────────────────────────── */}
+        {assessmentList.length > 0 && (
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <BookOpenCheck className="size-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold text-foreground">
+                Últimas notas lançadas
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {assessmentList.slice(0, 5).map(a => (
+                <div
+                  key={String(a.id)}
+                  className="flex items-center justify-between rounded-lg border bg-card px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {String(a.title || a.name || "Avaliação")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {a.assessmentDate
+                        ? new Date(String(a.assessmentDate)).toLocaleDateString(
+                            "pt-BR"
+                          )
+                        : "Data não informada"}
+                    </p>
+                  </div>
+                  {a.maxScore != null && (
+                    <Badge variant="outline" className="ml-3 shrink-0">
+                      Máx: {String(a.maxScore)}
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Avisos pendentes ────────────────────────────────────────────────── */}
+        {notifList.length > 0 && (
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <Bell className="size-4 text-amber-500" />
+              <h3 className="text-sm font-semibold text-foreground">
+                Avisos não lidos
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {notifList.slice(0, 5).map(n => (
+                <div
+                  key={String(n.id)}
+                  className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30"
+                >
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                    {String(n.title || n.subject || "Comunicado")}
+                  </p>
+                  {renderSafe(n.body) && (
+                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                      {String(n.body).substring(0, 120)}
+                      {String(n.body).length > 120 ? "…" : ""}
+                    </p>
+                  )}
+                  {renderSafe(n.createdAt) && (
+                    <p className="mt-1 text-xs text-amber-600/70 dark:text-amber-500/70">
+                      {new Date(String(n.createdAt)).toLocaleDateString(
+                        "pt-BR"
+                      )}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Últimos comentários ─────────────────────────────────────────────── */}
+        {commentList.length > 0 && (
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <FileText className="size-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold text-foreground">
+                Últimos comentários
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {commentList.slice(0, 5).map(c => {
+                const cat = String(c.category);
+                return (
+                  <div
+                    key={String(c.id)}
+                    className="rounded-lg border bg-card px-4 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{categoryIcon(cat)}</span>
+                      <span className="text-xs font-medium capitalize text-muted-foreground">
+                        {cat}
+                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {c.createdAt
+                          ? new Date(String(c.createdAt)).toLocaleDateString(
+                              "pt-BR"
+                            )
+                          : ""}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-foreground">
+                      {String(c.content).substring(0, 120)}
+                      {String(c.content).length > 120 ? "…" : ""}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

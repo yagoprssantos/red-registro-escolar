@@ -1,71 +1,61 @@
-import { useState } from "react";
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/core/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Badge,
-  Button,
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
+} from "@/components/ui/card";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Separator,
-  Skeleton,
-  Toast,
-  Toaster,
-} from "@/components/ui";
-import {
-  Bell,
-  Check,
-  Clock,
-  Loader2,
-  MessageCircle,
-  Phone,
-  X,
-} from "lucide-react";
+} from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { Bell, Check, Clock, MessageCircle, X } from "lucide-react";
+import { useState } from "react";
 
 export default function NotificationsCenter() {
   const { user } = useAuth();
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
-  // Fetch notifications
-  const { data: notifications = [], isLoading: isLoading, error } =
+  const { data: notifications = [], isLoading } =
     trpc.registry.notifications.mine.useQuery(
       {
         limit: 50,
         offset: 0,
-        unreadOnly: filter === "unread"
+        unreadOnly: filter === "unread",
       },
       {
         enabled: !!user,
       }
     );
 
-  // Mutation for marking notification as read
+  const utils = trpc.useUtils();
+
   const markAsReadMutation = trpc.registry.notifications.markRead.useMutation({
     onSuccess: () => {
-      // Invalidate notifications to refetch
-      trpc.registry.notifications.mine.invalidate();
-    }
+      void utils.registry.notifications.mine.invalidate();
+    },
   });
 
-  // Mutation for marking all as read
-  const markAllAsReadMutation = trpc.registry.notifications.markAllRead.useMutation({
-    onSuccess: () => {
-      trpc.registry.notifications.mine.invalidate();
-    }
-  });
+  const markAllAsReadMutation =
+    trpc.registry.notifications.markAllRead.useMutation({
+      onSuccess: () => {
+        void utils.registry.notifications.mine.invalidate();
+      },
+    });
 
   if (!user) {
     return <div>Unauthorized</div>;
   }
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n: any) => !n.isRead).length;
 
   return (
     <div className="space-y-6">
@@ -80,10 +70,15 @@ export default function NotificationsCenter() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon">
-                <Bell className={cn("h-4 w-4", unreadCount > 0 ? "text-red-500" : "text-muted-foreground")} />
+                <Bell
+                  className={cn(
+                    "h-4 w-4",
+                    unreadCount > 0 ? "text-red-500" : "text-muted-foreground"
+                  )}
+                />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="short">
+            <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setFilter("all")}>
                 Todas as notificações
               </DropdownMenuItem>
@@ -117,79 +112,88 @@ export default function NotificationsCenter() {
 
       {!isLoading && notifications.length > 0 && (
         <div className="space-y-4">
-          {notifications.map((notification) => (
-            <Card key={notification.id} className={cn("border", !notification.isRead && "border-blue-500")}>
+          {notifications.map((notification: any) => (
+            <Card
+              key={notification.id}
+              className={cn(
+                "border",
+                !notification.isRead && "border-blue-500"
+              )}
+            >
               <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2">
-                    {getNotificationIcon(notification.notificationType)}
-                    <h2 className="card-title text-sm font-semibold">
-                      {notification.title}
-                    </h2>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(notification.createdAt).toLocaleDateString('pt-BR', {
-                      day: '2',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
+                <div className="flex items-center gap-2">
+                  {getNotificationIcon(notification.notificationType)}
+                  <h2 className="card-title text-sm font-semibold">
+                    {notification.title}
+                  </h2>
                 </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(notification.createdAt).toLocaleDateString(
+                      "pt-BR",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    )}
+                  </span>
+                  {!notification.isRead && (
+                    <Button variant="ghost" size="icon">
+                      <Bell className="h-3 w-3 text-blue-500" />
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm">{notification.body}</p>
+                {notification.actionUrl && (
+                  <div className="mt-2">
+                    <a
+                      href={notification.actionUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Ver detalhes →
+                    </a>
+                  </div>
+                )}
+              </CardContent>
+              <CardFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 {!notification.isRead && (
-                  <Button variant="ghost" size="icon">
-                    <Bell className="h-3 w-3 text-blue-500" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      markAsReadMutation.mutate({
+                        id: notification.id,
+                      })
+                    }
+                  >
+                    <Check className="h-3 w-3 mr-2" /> Marcar como lida
                   </Button>
                 )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm">
-                {notification.body}
-              </p>
-              {notification.actionUrl && (
-                <div className="mt-2">
-                  <a
-                    href={notification.actionUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Ver detalhes →
-                  </a>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              {!notification.isRead && (
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => markAsReadMutation.mutate({ notificationId: notification.id })}
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    // Delete notification (if implemented)
+                  }}
                 >
-                  <Check className="h-3 w-3 mr-2" /> Marcar como lida
+                  <X className="h-3 w-3 text-muted-foreground" />
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  // Delete notification (if implemented)
-                }}
-              >
-                <X className="h-3 w-3 text-muted-foreground" />
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-// Helper function to get notification icon
 function getNotificationIcon(type: string) {
   switch (type) {
     case "absence_alert":

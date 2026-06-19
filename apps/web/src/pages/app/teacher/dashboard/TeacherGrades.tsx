@@ -2,18 +2,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 type Tab = "grades" | "assessments" | "summary";
 
 export default function TeacherGrades() {
   const [tab, setTab] = useState<Tab>("assessments");
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
-  const [selectedAssessmentId, setSelectedAssessmentId] = useState<
-    number | null
-  >(null);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(null);
   const [assessmentTitle, setAssessmentTitle] = useState("");
   const [assessmentDate, setAssessmentDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -22,25 +20,25 @@ export default function TeacherGrades() {
   const [scores, setScores] = useState<Record<number, string>>({});
   const [showNewAssessment, setShowNewAssessment] = useState(false);
 
+  const { data: teacherProfile } = trpc.profiles.teacher.me.useQuery();
   const { data: classes } = trpc.profiles.teacher.classes.useQuery();
   const classList = (classes ?? []) as RegistryRow[];
 
-  // Subjects for selected class
-  const { data: classSubjects } = trpc.registry.list.useQuery(
-    {
-      entity: "classSubjects" as const,
-      filters: selectedClassId ? { classId: selectedClassId } : {},
-      limit: 50,
-    },
-    { enabled: !!selectedClassId }
-  );
-  const subjectList = (classSubjects ?? []) as RegistryRow[];
-  const activeSubject = subjectList[0] as RegistryRow | undefined;
+  // Resolve classSubjectId from class list — no extra query needed
+  const selectedClass = classList.find(c => c.id === selectedClassId);
+  const classSubjectId = selectedClass?.classSubjectId as number | undefined;
 
-  // Assessments for selected class
+  // Assessments for this teacher and class
   const { data: assessments } = trpc.registry.list.useQuery(
-    { entity: "assessments" as const, limit: 100 },
-    { enabled: !!selectedClassId }
+    {
+      entity: "assessments" as const,
+      filters:
+        teacherProfile && classSubjectId
+          ? { teacherId: teacherProfile.id as number, classSubjectId }
+          : {},
+      limit: 100,
+    },
+    { enabled: !!selectedClassId && !!teacherProfile && !!classSubjectId }
   );
   const assessmentList = (assessments ?? []) as RegistryRow[];
 
@@ -72,31 +70,30 @@ export default function TeacherGrades() {
 
   // Class summary
   const { data: classSummary } = trpc.grades.classSummary.useQuery(
-    { classId: selectedClassId! },
-    { enabled: tab === "summary" && !!selectedClassId }
+    { classSubjectId: classSubjectId! },
+    { enabled: tab === "summary" && !!classSubjectId }
   );
 
   const createAssessment = trpc.grades.assessmentCreate.useMutation();
-  const recordScore = trpc.grades.record.useMutation();
+  const recordScore = trpc.grades.create.useMutation();
 
-  // Initialize scores from existing data
-  const selectedAssessment = assessmentList.find(
-    a => a.id === selectedAssessmentId
-  );
-  const assessmentMaxScore = selectedAssessment
-    ? Number(selectedAssessment.maxScore)
-    : maxScore;
+  const selectedAssessment = assessmentList.find(a => a.id === selectedAssessmentId);
+  const assessmentMaxScore = selectedAssessment ? Number(selectedAssessment.maxScore) : maxScore;
+
+  function getClassName(cls: RegistryRow) {
+    return String(cls.displayName || cls.gradeLabel || cls.name || `Turma ${cls.id}`);
+  }
 
   async function handleCreateAssessment(e: FormEvent) {
     e.preventDefault();
-    if (!activeSubject) {
+    if (!classSubjectId) {
       toast.error("Nenhuma disciplina vinculada a esta turma");
       return;
     }
 
     try {
       await createAssessment.mutateAsync({
-        classSubjectId: activeSubject.id as number,
+        classSubjectId,
         title: assessmentTitle,
         maxScore,
         weight: 1,
@@ -143,8 +140,8 @@ export default function TeacherGrades() {
 
   return (
     <div className="space-y-6">
-      {/* Class selector */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Class selector + tabs */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <label className="mb-1 block text-sm font-medium">Turma</label>
           <select
@@ -158,7 +155,7 @@ export default function TeacherGrades() {
             <option value="">Selecione...</option>
             {classList.map(cls => (
               <option key={String(cls.id)} value={String(cls.id)}>
-                {String(cls.name || cls.gradeLabel)}
+                {getClassName(cls)}
               </option>
             ))}
           </select>
@@ -209,7 +206,7 @@ export default function TeacherGrades() {
                 onChange={e => setAssessmentTitle(e.target.value)}
                 required
               />
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">
                     Nota máxima
@@ -220,17 +217,6 @@ export default function TeacherGrades() {
                     onChange={e => setMaxScore(Number(e.target.value))}
                     min={1}
                     max={100}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">
-                    Peso
-                  </label>
-                  <Input
-                    type="number"
-                    value={1}
-                    disabled
-                    className="bg-muted"
                   />
                 </div>
                 <div>
@@ -269,7 +255,9 @@ export default function TeacherGrades() {
       {/* Assessments tab */}
       {tab === "assessments" && selectedClassId && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Avaliações cadastradas</h3>
+          <h3 className="text-sm font-semibold">
+            Avaliações — {selectedClass ? getClassName(selectedClass) : ""}
+          </h3>
           {assessmentList.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Nenhuma avaliação criada
@@ -285,9 +273,7 @@ export default function TeacherGrades() {
                 <p className="text-xs text-muted-foreground">
                   Máx: {String(a.maxScore)} ·{" "}
                   {a.assessmentDate
-                    ? new Date(String(a.assessmentDate)).toLocaleDateString(
-                        "pt-BR"
-                      )
+                    ? new Date(String(a.assessmentDate)).toLocaleDateString("pt-BR")
                     : "—"}
                 </p>
               </div>
@@ -344,8 +330,7 @@ export default function TeacherGrades() {
                     scores[student.id as number] ??
                     (existing ? String(existing.score) : "");
                   const scoreNum = parseFloat(currentScore);
-                  const isOverMax =
-                    !isNaN(scoreNum) && scoreNum > assessmentMaxScore;
+                  const isOverMax = !isNaN(scoreNum) && scoreNum > assessmentMaxScore;
 
                   return (
                     <div
@@ -402,56 +387,40 @@ export default function TeacherGrades() {
       {tab === "summary" && selectedClassId && (
         <Card>
           <CardHeader>
-            <CardTitle>Resumo da Turma</CardTitle>
+            <CardTitle>Resumo — {selectedClass ? getClassName(selectedClass) : ""}</CardTitle>
           </CardHeader>
           <CardContent>
             {(classSummary as RegistryRow | null) ? (
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="rounded-lg bg-muted p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Média da turma
-                    </p>
+                    <p className="text-xs text-muted-foreground">Média da turma</p>
                     <p className="text-2xl font-bold">
-                      {String(
-                        (classSummary as RegistryRow)?.classAverage ?? "—"
-                      )}
+                      {String((classSummary as RegistryRow)?.classAverage ?? "—")}
                     </p>
                   </div>
                   <div className="rounded-lg bg-muted p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Total de avaliações
-                    </p>
+                    <p className="text-xs text-muted-foreground">Total de avaliações</p>
                     <p className="text-2xl font-bold">
-                      {String(
-                        (classSummary as RegistryRow)?.assessmentCount ?? 0
-                      )}
+                      {String((classSummary as RegistryRow)?.assessmentCount ?? 0)}
                     </p>
                   </div>
                   <div className="rounded-lg bg-muted p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Alunos abaixo da média
-                    </p>
+                    <p className="text-xs text-muted-foreground">Alunos abaixo da média</p>
                     <p className="text-2xl font-bold text-red-500">
-                      {String(
-                        (classSummary as RegistryRow)?.belowAverageCount ?? 0
-                      )}
+                      {String((classSummary as RegistryRow)?.belowAverageCount ?? 0)}
                     </p>
                   </div>
                 </div>
 
-                {/* Students with averages */}
                 {(
-                  ((classSummary as RegistryRow)?.students ??
-                    []) as RegistryRow[]
+                  ((classSummary as RegistryRow)?.students ?? []) as RegistryRow[]
                 ).map(s => (
                   <div
                     key={String(s.studentId)}
                     className="flex items-center justify-between rounded-lg border px-4 py-3"
                   >
-                    <span className="text-sm font-medium">
-                      {String(s.studentName)}
-                    </span>
+                    <span className="text-sm font-medium">{String(s.studentName)}</span>
                     <span
                       className={`text-sm font-bold ${
                         Number(s.average) >= 7

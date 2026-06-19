@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { Calendar } from "lucide-react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
   prova:

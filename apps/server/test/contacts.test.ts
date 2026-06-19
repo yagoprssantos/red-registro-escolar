@@ -19,6 +19,26 @@ function createPublicContext(): TrpcContext {
   return ctx;
 }
 
+function createAuthContext(userId = 1): TrpcContext {
+  const user: AuthenticatedUser = {
+    id: userId,
+    openId: `user-${userId}`,
+    email: `user${userId}@example.com`,
+    name: `User ${userId}`,
+    loginMethod: "oauth",
+    role: "user",
+    defaultProfile: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  };
+  return {
+    user,
+    req: { protocol: "https", headers: {} } as TrpcContext["req"],
+    res: { clearCookie: () => {} } as unknown as TrpcContext["res"],
+  };
+}
+
 describe("contacts router", () => {
   it("creates a new contact with valid input", async () => {
     const ctx = createPublicContext();
@@ -124,19 +144,19 @@ describe("contacts router", () => {
     expect(result.contact?.message).toBeNull();
   });
 
-  it("lists contacts", async () => {
-    const ctx = createPublicContext();
-    const caller = appRouter.createCaller(ctx);
-
-    // Create a contact first
-    await caller.contacts.create({
+  it("lists contacts (requires authentication)", async () => {
+    // Create contact via public endpoint
+    const publicCaller = appRouter.createCaller(createPublicContext());
+    await publicCaller.contacts.create({
       name: "Contact 1",
       email: "contact1@example.com",
       school: "School 1",
       role: "professor",
     });
 
-    const contacts = await caller.contacts.list();
+    // List requires an authenticated user
+    const authCaller = appRouter.createCaller(createAuthContext());
+    const contacts = await authCaller.contacts.list();
     expect(Array.isArray(contacts)).toBe(true);
     expect(contacts.length).toBeGreaterThan(0);
   });

@@ -1,21 +1,22 @@
+import { Button } from "@/components/ui/button";
 import {
-  Button,
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  Skeleton,
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Toaster } from "@/components/ui/sonner";
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-  Toaster,
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui";
+} from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAuth } from "@/core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Calendar, CheckCircle2, Menu, Plus } from "lucide-react";
@@ -33,36 +34,44 @@ export default function RecordAttendance() {
       enabled: !!user,
     });
 
-  // Fetch class sessions for selected class and date
-  const { data: sessions = [], isLoading: isLoadingSessions } =
-    trpc.classSessions.byClassAndDate.useQuery(
+  const utils = trpc.useUtils();
+
+  // Fetch class sessions for selected class and date via registry
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rawSessions = [], isLoading: isLoadingSessions } =
+    trpc.registry.list.useQuery(
       {
-        classId: selectedClassId ?? undefined,
-        date: date.toISOString().split("T")[0],
+        entity: "classSessions" as const,
+        filters: selectedClassId
+          ? { lessonDate: date.toISOString().split("T")[0] }
+          : {},
+        limit: 50,
       },
       {
         enabled: !!selectedClassId && !!user,
       }
     );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sessions = rawSessions as any[];
+
   // Fetch attendance records for selected session
   const { data: attendanceRecords = [], isLoading: isLoadingAttendance } =
-    trpc.attendanceRecords.bySession.useQuery(
-      { sessionId: sessions[0]?.id ?? undefined },
+    trpc.attendance.bySession.useQuery(
+      { sessionId: (sessions[0]?.id as number) ?? 0 },
       {
         enabled: !!sessions[0] && !!user,
       }
     );
 
   // Mutation for creating attendance record
-  const attendanceMutation = trpc.attendanceRecords.create.useMutation({
+  const attendanceMutation = trpc.attendance.create.useMutation({
     onSuccess: () => {
-      // Invalidate attendance records to refetch
-      trpc.attendanceRecords.bySession.invalidate({
-        sessionId: sessions[0]?.id,
+      void utils.attendance.bySession.invalidate({
+        sessionId: (sessions[0]?.id as number) ?? 0,
       });
     },
-    onError: error => {
+    onError: (error: unknown) => {
       console.error("Failed to record attendance:", error);
     },
   });
@@ -72,9 +81,7 @@ export default function RecordAttendance() {
   }
 
   // Filter classes to only those taught by this teacher (simplified)
-  const teacherClasses = classes.filter(
-    cls => cls.teachers?.some(t => t.userId === user.id) || true // Simplified check
-  );
+  const teacherClasses = classes;
 
   return (
     <div className="space-y-6">
@@ -181,19 +188,18 @@ export default function RecordAttendance() {
                               <div className="flex items-center justify-center gap-2">
                                 {studentAttendances.map(attendance => (
                                   <ToggleGroup
-                                    key={attendance.studentId}
-                                    type="radio"
-                                    value={attendance.status}
-                                    onValueChange={value => {
+                                    key={String(attendance.studentId)}
+                                    type="single"
+                                    value={attendance.status as string}
+                                    onValueChange={(value: string) => {
                                       attendanceMutation.mutate({
-                                        classSessionId: session.id,
-                                        studentId: attendance.studentId,
+                                        classSessionId: session.id as number,
+                                        studentId: attendance.studentId as number,
                                         status: value as
                                           | "present"
                                           | "absent"
                                           | "justified",
-                                        reason: attendance.reason || undefined,
-                                        recordedByTeacherId: user.id,
+                                        reason: (attendance.reason as string) || undefined,
                                       });
                                     }}
                                     className="flex items-center gap-1"
@@ -265,13 +271,13 @@ export default function RecordAttendance() {
                   }}
                   className="w-full text-left"
                 >
-                  {cls.name} ({cls.gradeLabel} - {cls.shift})
+                  {cls.name}
                 </Button>
               ))}
             </div>
           )}
 
-          <SheetDivider className="my-4" />
+          <div className="my-4 border-t" />
 
           <div className="flex justify-end space-x-3">
             <Button

@@ -1,15 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { Check, MessageSquare } from "lucide-react";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 type Filter = "all" | "unread";
 
 export default function TeacherCommunications() {
   const [filter, setFilter] = useState<Filter>("all");
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+  const schoolId = mySchools?.[0]?.schoolId;
 
   const { data: communications } = trpc.communications.forUser.useQuery(
     { schoolId: schoolId! },

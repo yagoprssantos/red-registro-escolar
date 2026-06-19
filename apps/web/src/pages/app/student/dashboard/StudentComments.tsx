@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const CATEGORIES = [
   { value: "all", label: "Todos" },
@@ -14,7 +14,7 @@ export default function StudentComments() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const { data: profile } = trpc.profiles.student.me.useQuery();
   const { data: comments } = trpc.comments.forStudent.useQuery(
-    { studentId: (profile as RegistryRow)?.id ?? 0 },
+    { studentId: profile?.id ?? 0 },
     { enabled: !!profile }
   );
 

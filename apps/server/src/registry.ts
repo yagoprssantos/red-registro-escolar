@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "./core/trpc";
 import {
+  batchResolveSchoolIds,
   createEntityRow,
   deleteEntityRow,
   entitySupportsSoftDelete,
@@ -48,6 +49,8 @@ const registryEntities = [
   "attachments",
   "absenceJustifications",
   "auditLogs",
+  "tasks",
+  "taskSubmissions",
 ] as const;
 
 const entitySchema = z.enum(registryEntities);
@@ -762,6 +765,29 @@ async function validatePayloadAndResolveSchool(
       );
     }
 
+    case "schoolPlatforms": {
+      const schoolId = requireId("schoolId");
+      await getRequiredRow("schools", schoolId, "Escola");
+      return schoolId;
+    }
+
+    case "scheduleSlots": {
+      const schoolId = requireId("schoolId");
+      await getRequiredRow("schools", schoolId, "Escola");
+      return schoolId;
+    }
+
+    case "auditLogs": {
+      const schoolId = optionalId("schoolId");
+      return schoolId ?? null;
+    }
+
+    case "absenceJustifications":
+    case "tasks":
+    case "taskSubmissions": {
+      return null;
+    }
+
     default: {
       const exhaustive: never = entity;
       throw new TRPCError({
@@ -807,15 +833,12 @@ export const registryRouter = router({
       }
 
       const managedSchoolIds = new Set(await getUserManagedSchoolIds(user.id));
-      const filtered: unknown[] = [];
-
-      for (const row of rows) {
-        const rowRecord = asRecord(row);
-        const schoolId = await resolveEntitySchoolId(input.entity, rowRecord);
-        if (schoolId && managedSchoolIds.has(schoolId)) {
-          filtered.push(row);
-        }
-      }
+      const rowRecords = rows.map(asRecord);
+      const schoolIds = await batchResolveSchoolIds(input.entity, rowRecords);
+      const filtered = rows.filter((_row, i) => {
+        const schoolId = schoolIds[i];
+        return schoolId != null && managedSchoolIds.has(schoolId);
+      });
 
       return filtered;
     }),
@@ -889,7 +912,7 @@ export const registryRouter = router({
       // Trigger automatic notifications based on entity type
       try {
         const { NotificationService } = await import(
-          "../domain/notification/notification.service"
+          "./domain/notifications/notification.service"
         );
 
         if (input.entity === "communications") {

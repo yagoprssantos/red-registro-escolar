@@ -72,7 +72,7 @@ export class EventsService {
     for (const s of students) {
       const enrollments = await listEntityRows("classEnrollments", {
         filters: {
-          studentId: (s as Record<string, unknown>).id,
+          studentId: (s as Record<string, unknown>).id as number,
           status: "ativo",
         },
       });
@@ -88,12 +88,12 @@ export class EventsService {
     });
     for (const g of guardians) {
       const sgs = await listEntityRows("studentGuardians", {
-        filters: { guardianId: (g as Record<string, unknown>).id },
+        filters: { guardianId: (g as Record<string, unknown>).id as number },
       });
       for (const sg of sgs) {
         const enrollments = await listEntityRows("classEnrollments", {
           filters: {
-            studentId: (sg as Record<string, unknown>).studentId,
+            studentId: (sg as Record<string, unknown>).studentId as number,
             status: "ativo",
           },
         });
@@ -110,11 +110,11 @@ export class EventsService {
     });
     for (const t of teachers) {
       const cts = await listEntityRows("classTeachers", {
-        filters: { teacherId: (t as Record<string, unknown>).id },
+        filters: { teacherId: (t as Record<string, unknown>).id as number },
       });
       for (const ct of cts) {
         const cs = await listEntityRows("classSubjects", {
-          filters: { id: (ct as Record<string, unknown>).classSubjectId },
+          filters: { id: (ct as Record<string, unknown>).classSubjectId as number },
         });
         for (const c of cs) {
           classIds.push((c as Record<string, unknown>).classId as number);

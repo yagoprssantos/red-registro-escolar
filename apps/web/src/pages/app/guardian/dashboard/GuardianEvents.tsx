@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { CalendarClock } from "lucide-react";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   prova: "📝 Prova",
@@ -22,7 +22,7 @@ const EVENT_FILTERS = [
 export default function GuardianEvents() {
   const [filter, setFilter] = useState<string>("all");
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+  const schoolId = mySchools?.[0]?.schoolId;
 
   const { data: events } = trpc.events.forUser.useQuery(
     { schoolId: schoolId! },

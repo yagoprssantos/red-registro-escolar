@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const CATEGORIES = [
   { value: "elogio", label: "⭐ Elogio", color: "text-green-600" },
@@ -68,7 +68,7 @@ export default function TeacherComments() {
 
   // History: comments by teacher
   const { data: comments } = trpc.comments.byTeacher.useQuery(
-    { teacherId: ((teacherProfile as RegistryRow)?.id as number) ?? 0 },
+    { teacherId: teacherProfile?.id ?? 0 },
     { enabled: tab === "history" && !!teacherProfile }
   );
   const commentList = ((comments ?? []) as RegistryRow[]).filter(c => {
@@ -309,7 +309,7 @@ export default function TeacherComments() {
                     <span className="text-xs font-medium capitalize text-muted-foreground">
                       {cat}
                     </span>
-                    {comment.studentName && (
+                    {Boolean(comment.studentName) && (
                       <span className="text-xs text-foreground">
                         — {String(comment.studentName)}
                       </span>

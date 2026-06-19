@@ -281,17 +281,6 @@ class SDKServer {
 
     let user = await db.getUserByOpenId(sessionUserId);
 
-    if (!user && sessionUserId.startsWith("supabase:")) {
-      await db.upsertUser({
-        openId: sessionUserId,
-        name: session.name,
-        loginMethod: "supabase",
-        lastSignedIn: signedInAt,
-      });
-
-      user = await db.getUserByOpenId(sessionUserId);
-    }
-
     // If user not in DB, sync from OAuth server automatically
     if (!user && ENV.oAuthServerUrl) {
       try {

@@ -10,62 +10,41 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 export default function StudentBio() {
-  const { data: me } = trpc.profiles.student.me.useQuery();
-  const student = me as RegistryRow | null | undefined;
+  const { data: me, isLoading: loadingMe } =
+    trpc.profiles.student.me.useQuery();
+  const { data: classInfo, isLoading: loadingClass } =
+    trpc.profiles.student.classInfo.useQuery();
+  const { data: guardians, isLoading: loadingGuardians } =
+    trpc.profiles.student.guardians.useQuery();
+  const { data: attendance, isLoading: loadingAttendance } =
+    trpc.profiles.student.attendance.useQuery();
 
-  const { data: enrollments } = trpc.registry.list.useQuery(
-    {
-      entity: "classEnrollments" as const,
-      filters: { studentId: student?.id, status: "ativo" },
-      limit: 10,
-    },
-    { enabled: !!student?.id }
-  );
-  const enrollment = ((enrollments ?? []) as RegistryRow[])[0];
+  if (loadingMe || loadingClass || loadingGuardians || loadingAttendance) {
+    return (
+      <div className="flex h-48 items-center justify-center">
+        <p className="animate-pulse text-sm text-muted-foreground">
+          Carregando ficha...
+        </p>
+      </div>
+    );
+  }
 
-  const { data: classes } = trpc.registry.list.useQuery({
-    entity: "classes" as const,
-    limit: 200,
-  });
-  const cls = enrollment
-    ? ((classes ?? []) as RegistryRow[]).find(c => c.id === enrollment.classId)
-    : null;
+  const student = me as Record<string, unknown> | null | undefined;
+  const cls = classInfo as Record<string, unknown> | null | undefined;
+  const guardianList = (guardians ?? []) as Array<{
+    id: number;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    relationship: string | null;
+  }>;
 
-  const { data: guardians } = trpc.registry.list.useQuery(
-    {
-      entity: "studentGuardians" as const,
-      filters: { studentId: student?.id },
-      limit: 10,
-    },
-    { enabled: !!student?.id }
-  );
-  const { data: guardianList } = trpc.registry.list.useQuery({
-    entity: "guardians" as const,
-    limit: 100,
-  });
-  const { data: attendanceRecords } = trpc.registry.list.useQuery(
-    { entity: "attendanceRecords" as const, limit: 2000 },
-    { enabled: !!student?.id }
-  );
-
-  const linkedGuardians = (guardians ?? []) as RegistryRow[];
-  const gList = (guardianList ?? []) as RegistryRow[];
-  const guardianDetails = linkedGuardians
-    .map(lg => gList.find(g => g.id === lg.guardianId))
-    .filter(Boolean) as RegistryRow[];
-
-  const myRecords = (attendanceRecords ?? []) as RegistryRow[];
-  const studentRecords = myRecords.filter(r => r.studentId === student?.id);
-  const totalRecords = studentRecords.length;
-  const absences = studentRecords.filter(r => r.status === "absent").length;
-  const justified = studentRecords.filter(r => r.status === "justified").length;
-  const attendancePct =
-    totalRecords > 0
-      ? Math.round(((totalRecords - absences) / totalRecords) * 100)
-      : 100;
+  const totalRecords = attendance?.total ?? 0;
+  const absences = attendance?.absents ?? 0;
+  const justified = attendance?.justified ?? 0;
+  const attendancePct = attendance?.pct ?? 100;
 
   const fields = [
     { icon: User, label: "Nome Completo", value: String(student?.name ?? "—") },
@@ -87,29 +66,28 @@ export default function StudentBio() {
     {
       icon: GraduationCap,
       label: "Série / Ano",
-      value: `${String(student?.grade ?? "—")} ano`,
+      value: `${String(student?.grade ?? "—")}`,
     },
     {
       icon: ShieldCheck,
       label: "Status",
-      value: String(student?.status ?? "—"),
+      value: String(student?.status ?? "ativo"),
     },
   ];
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <h2 className="text-lg font-semibold flex items-center gap-2">
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
         <Heart className="size-5" />
         Ficha Biográfica
       </h2>
 
-      {/* Student header */}
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-6 sm:flex-row sm:items-start">
           <div className="flex size-24 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-green-600 text-3xl font-bold text-white shadow-lg">
             {student?.name ? String(student.name).charAt(0).toUpperCase() : "?"}
           </div>
-          <div className="text-center sm:text-left flex-1">
+          <div className="flex-1 text-center sm:text-left">
             <h3 className="text-xl font-bold">
               {String(student?.name ?? "—")}
             </h3>
@@ -123,7 +101,7 @@ export default function StudentBio() {
                   {" "}
                   — Turma{" "}
                   <span className="font-medium">
-                    {String(cls.name ?? cls.gradeLabel ?? "")}
+                    {String(cls.className ?? cls.classCode ?? "")}
                   </span>
                 </>
               )}
@@ -132,7 +110,6 @@ export default function StudentBio() {
         </CardContent>
       </Card>
 
-      {/* Personal data */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Informações Pessoais</CardTitle>
@@ -142,7 +119,7 @@ export default function StudentBio() {
             const Icon = f.icon;
             return (
               <div key={f.label} className="flex items-start gap-3">
-                <Icon className="size-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <Icon className="mt-0.5 size-4 flex-shrink-0 text-muted-foreground" />
                 <div className="flex-1">
                   <p className="text-xs text-muted-foreground">{f.label}</p>
                   <p
@@ -157,43 +134,41 @@ export default function StudentBio() {
         </CardContent>
       </Card>
 
-      {/* Guardians */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Responsáveis</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {guardianDetails.length === 0 && (
+          {guardianList.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Nenhum responsável vinculado
             </p>
           )}
-          {guardianDetails.map(g => (
+          {guardianList.map(g => (
             <div
-              key={String(g.id)}
+              key={g.id}
               className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3"
             >
               <div>
-                <p className="text-sm font-medium">{String(g.name)}</p>
+                <p className="text-sm font-medium">{g.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {String(g.relationship ?? "Responsável")}
+                  {g.relationship ?? "Responsável"}
                 </p>
               </div>
               <div className="text-right text-sm text-muted-foreground">
-                {String(g.phone ?? g.email ?? "")}
+                {g.phone ?? g.email ?? ""}
               </div>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {/* Academic summary */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Resumo Acadêmico</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="text-center">
               <p className="text-2xl font-bold">{totalRecords}</p>
               <p className="text-xs text-muted-foreground">Total aulas</p>

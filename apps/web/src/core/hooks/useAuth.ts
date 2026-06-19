@@ -1,4 +1,5 @@
 import { getLoginUrl } from "@/const";
+import { toRegistryUser } from "@/lib/mappers/user";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
@@ -41,20 +42,28 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [logoutMutation, utils]);
 
+  const user = useMemo(() => {
+    return meQuery.data ? toRegistryUser(meQuery.data) : null;
+  }, [meQuery.data]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("app-runtime-user-info", JSON.stringify(user));
+  }, [user]);
+
   const state = useMemo(() => {
-    localStorage.setItem("app-runtime-user-info", JSON.stringify(meQuery.data));
     return {
-      user: meQuery.data ?? null,
+      user,
       loading: meQuery.isLoading || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      isAuthenticated: Boolean(user),
     };
   }, [
-    meQuery.data,
-    meQuery.error,
+    user,
     meQuery.isLoading,
-    logoutMutation.error,
+    meQuery.error,
     logoutMutation.isPending,
+    logoutMutation.error,
   ]);
 
   useEffect(() => {

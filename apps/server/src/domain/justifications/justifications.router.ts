@@ -47,7 +47,7 @@ export const justificationsRouter = router({
           );
           // Notify school staff about pending justification
           const schoolStaff = await listEntityRows("schoolStaffProfiles", {
-            filters: { schoolId: j.schoolId },
+            filters: { schoolId: j.schoolId as number },
           });
           const { createNotification } = await import("../../db");
           for (const staff of schoolStaff) {

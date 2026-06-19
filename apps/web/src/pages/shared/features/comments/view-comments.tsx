@@ -1,14 +1,13 @@
+import { Badge } from "@/components/ui/badge";
 import {
-  Badge,
   Card,
   CardContent,
   CardFooter,
   CardHeader,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui";
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Toaster } from "@/components/ui/sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { User } from "lucide-react";
@@ -18,46 +17,23 @@ export default function ViewComments() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"received" | "sent">("received");
 
-  // Determine user role and appropriate visibility filters
-  const userRole = user?.role; // "teacher", "student", "guardian", etc.
-
-  // Fetch comments based on user role and tab
+  // Fetch comments via registry (access control applied server-side by role)
   const {
-    data: comments = [],
-    isLoading: isLoading,
+    data: rawComments,
+    isLoading,
     error,
-  } = trpc.comments.forViewer.useQuery(
+  } = trpc.registry.list.useQuery(
     {
-      viewerId: user?.id ?? undefined,
-      tab: tab,
-      visibilityFilter: getVisibilityFilter(userRole, tab),
+      entity: "studentComments" as const,
+      limit: 50,
     },
     {
       enabled: !!user,
     }
   );
 
-  // Get visibility filter based on user role and tab
-  function getVisibilityFilter(
-    role: string | undefined,
-    tab: "received" | "sent"
-  ): string[] {
-    if (!role) return [];
-
-    switch (role) {
-      case "student":
-        // Aluno vê apenas comments com visibility IN ('student', 'all')
-        return tab === "received" ? ["student", "all"] : ["all"]; // Para sent, apenas aqueles que ele criou (visibility all por padrão)
-      case "guardian":
-        // Responsável vê apenas comments com visibility IN ('guardian', 'all')
-        return tab === "received" ? ["guardian", "all"] : ["all"];
-      case "teacher":
-        // Professor vê todos os comments das suas turmas (simplificado)
-        return ["all"];
-      default:
-        return ["all"];
-    }
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const comments: any[] = (rawComments ?? []) as any[];
 
   if (!user) {
     return <div>Unauthorized</div>;
@@ -77,7 +53,7 @@ export default function ViewComments() {
       <Tabs
         defaultValue="received"
         value={tab}
-        onValueChange={setTab}
+        onValueChange={(v) => setTab(v as "received" | "sent")}
         className="w-full"
       >
         <TabsList className="grid w-full grid-cols-2">
@@ -107,7 +83,7 @@ export default function ViewComments() {
 
           {!isLoading && comments.length > 0 && (
             <div className="space-y-4">
-              {comments.map(comment => (
+              {comments.map((comment: any) => (
                 <Card key={comment.id} className="border">
                   <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -118,7 +94,7 @@ export default function ViewComments() {
                         {new Date(comment.createdAt).toLocaleDateString(
                           "pt-BR",
                           {
-                            day: "2",
+                            day: "2-digit",
                             month: "short",
                             year: "numeric",
                           }

@@ -8,81 +8,49 @@ import {
   ShieldX,
 } from "lucide-react";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 const PE_DE_MEIA_THRESHOLD = 80;
 
 export default function StudentAttendance() {
-  const { data: me } = trpc.profiles.student.me.useQuery();
-  const student = me as RegistryRow | null | undefined;
-
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("");
 
-  const { data: records } = trpc.registry.list.useQuery(
-    { entity: "attendanceRecords" as const, limit: 2000 },
-    { enabled: !!student }
-  );
-  const { data: sessions } = trpc.registry.list.useQuery({
-    entity: "classSessions" as const,
-    limit: 2000,
-  });
-  const { data: classSubjects } = trpc.registry.list.useQuery({
-    entity: "classSubjects" as const,
-    limit: 200,
-  });
-  const { data: subjectDefs } = trpc.registry.list.useQuery({
-    entity: "subjects" as const,
-    limit: 100,
-  });
+  const { data: stats, isLoading: loadingStats } = trpc.profiles.student.attendance.useQuery();
+  const { data: records, isLoading: loadingRecords } = trpc.profiles.student.attendanceDetail.useQuery();
 
-  const allRecords = (records ?? []) as RegistryRow[];
-  const allSessions = (sessions ?? []) as RegistryRow[];
-  const csList = (classSubjects ?? []) as RegistryRow[];
-  const subDefs = (subjectDefs ?? []) as RegistryRow[];
+  if (loadingStats || loadingRecords) {
+    return (
+      <div className="flex h-48 items-center justify-center">
+        <p className="animate-pulse text-sm text-muted-foreground">Carregando frequência...</p>
+      </div>
+    );
+  }
 
-  const myRecords = allRecords.filter(r => r.studentId === student?.id);
+  const enriched = (records ?? []).map(r => ({
+    id: r.id,
+    status: r.status,
+    date: r.date ?? "",
+    subject: r.subject ?? "—",
+    subjectId: r.subjectId,
+  }));
 
-  const enriched = myRecords.map(r => {
-    const session = allSessions.find(s => s.id === r.classSessionId);
-    const cs = session
-      ? csList.find(c => c.id === session.classSubjectId)
-      : null;
-    const subject = cs ? subDefs.find(s => s.id === cs.subjectId) : null;
-    return {
-      ...r,
-      date: session?.lessonDate ? String(session.lessonDate) : "",
-      subject: subject ? String(subject.name) : "—",
-      subjectId: cs?.subjectId,
-    };
-  });
-
-  const total = enriched.length;
-  const presents = enriched.filter(r => r.status === "present").length;
-  const absents = enriched.filter(r => r.status === "absent").length;
-  const justified = enriched.filter(r => r.status === "justified").length;
-  const pct = total > 0 ? Math.round((presents / total) * 100) : 100;
+  const total = stats?.total ?? enriched.length;
+  const presents = stats?.presents ?? enriched.filter(r => r.status === "present").length;
+  const absents = stats?.absents ?? enriched.filter(r => r.status === "absent").length;
+  const justified = stats?.justified ?? enriched.filter(r => r.status === "justified").length;
+  const pct = stats?.pct ?? (total > 0 ? Math.round((presents / total) * 100) : 100);
 
   const peDeMeiaOk = pct >= PE_DE_MEIA_THRESHOLD;
   const maxAbsencesAllowed = Math.floor(0.2 * total);
   const absencesRemaining = Math.max(0, maxAbsencesAllowed - absents);
 
-  // Consecutive absences
-  const sortedEnriched = [...enriched].sort((a, b) =>
-    a.date.localeCompare(b.date)
-  );
+  const sortedEnriched = [...enriched].sort((a, b) => a.date.localeCompare(b.date));
   let currentStreak = 0;
-  let maxConsecutive = 0;
   for (const r of sortedEnriched) {
-    if (r.status === "absent") {
-      currentStreak++;
-      maxConsecutive = Math.max(maxConsecutive, currentStreak);
-    } else {
-      currentStreak = 0;
-    }
+    if (r.status === "absent") currentStreak++;
+    else currentStreak = 0;
   }
 
-  // Apply filters
   let filtered = enriched;
   if (subjectFilter !== "all")
     filtered = filtered.filter(r => String(r.subjectId) === subjectFilter);
@@ -90,21 +58,18 @@ export default function StudentAttendance() {
     filtered = filtered.filter(r => r.date.startsWith(monthFilter));
   filtered = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
-  const uniqueSubjects = [
-    ...new Map(enriched.map(r => [r.subjectId, r.subject])).entries(),
-  ];
+  const uniqueSubjects = Array.from(
+    new Map(enriched.map(r => [r.subjectId, r.subject])).entries()
+  );
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <h2 className="text-lg font-semibold flex items-center gap-2">
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
         <ClipboardList className="size-5" />
         Frequência
       </h2>
 
-      {/* Pé de Meia Card */}
-      <Card
-        className={`border-l-4 ${peDeMeiaOk ? "border-l-green-500" : "border-l-red-500"}`}
-      >
+      <Card className={`border-l-4 ${peDeMeiaOk ? "border-l-green-500" : "border-l-red-500"}`}>
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -115,9 +80,7 @@ export default function StudentAttendance() {
               )}
               <div>
                 <h3 className="text-sm font-semibold">Pé de Meia</h3>
-                <p className="text-xs text-muted-foreground">
-                  Programa de poupança do ensino médio
-                </p>
+                <p className="text-xs text-muted-foreground">Programa de poupança do ensino médio</p>
               </div>
             </div>
             <div className="text-right">
@@ -132,64 +95,56 @@ export default function StudentAttendance() {
               )}
             </div>
           </div>
-
           <div className="mt-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
               <span>Frequência: {pct}%</span>
               <span>Mínimo: {PE_DE_MEIA_THRESHOLD}%</span>
             </div>
-            <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className={`h-full rounded-full transition-all ${peDeMeiaOk ? "bg-green-500" : "bg-red-500"}`}
                 style={{ width: `${Math.min(pct, 100)}%` }}
               />
             </div>
           </div>
-
           {!peDeMeiaOk && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3 dark:bg-red-950/20 dark:border-red-800">
-              <ShieldAlert className="size-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/20">
+              <ShieldAlert className="mt-0.5 size-5 flex-shrink-0 text-red-600" />
               <div>
                 <p className="text-sm font-semibold text-red-700 dark:text-red-400">
                   Seu Pé de Meia está bloqueado!
                 </p>
-                <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5">
-                  Frequência abaixo de 80%. Você precisa atingir{" "}
-                  {PE_DE_MEIA_THRESHOLD}% para receber o benefício.
+                <p className="mt-0.5 text-xs text-red-600/80 dark:text-red-400/80">
+                  Frequência abaixo de 80%. Você precisa atingir {PE_DE_MEIA_THRESHOLD}% para receber o benefício.
                 </p>
               </div>
             </div>
           )}
           {peDeMeiaOk && absencesRemaining <= 3 && absencesRemaining > 0 && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/20 dark:border-amber-800">
-              <AlertTriangle className="size-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+              <AlertTriangle className="mt-0.5 size-5 flex-shrink-0 text-amber-600" />
               <div>
                 <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                  Atenção: {absencesRemaining}{" "}
-                  {absencesRemaining === 1 ? "falta" : "faltas"} restante
-                  {absencesRemaining === 1 ? "" : "s"} para perder o Pé de Meia
+                  Atenção: {absencesRemaining} {absencesRemaining === 1 ? "falta" : "faltas"} restante{absencesRemaining === 1 ? "" : "s"} para perder o Pé de Meia
                 </p>
-                <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">
-                  Cada falta a mais pode bloquear o benefício. Mantenha a
-                  frequência!
+                <p className="mt-0.5 text-xs text-amber-600/80 dark:text-amber-400/80">
+                  Cada falta a mais pode bloquear o benefício. Mantenha a frequência!
                 </p>
               </div>
             </div>
           )}
           {currentStreak >= 2 && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg bg-orange-50 border border-orange-200 p-3 dark:bg-orange-950/20 dark:border-orange-800">
-              <AlertTriangle className="size-5 text-orange-600 flex-shrink-0 mt-0.5" />
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-800 dark:bg-orange-950/20">
+              <AlertTriangle className="mt-0.5 size-5 flex-shrink-0 text-orange-600" />
               <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
-                {currentStreak} faltas consecutivas — cuidado para não perder o
-                Pé de Meia!
+                {currentStreak} faltas consecutivas — cuidado para não perder o Pé de Meia!
               </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Stats */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-green-600">{presents}</p>
@@ -204,9 +159,7 @@ export default function StudentAttendance() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p
-              className={`text-2xl font-bold ${pct >= PE_DE_MEIA_THRESHOLD ? "text-green-600" : "text-red-600"}`}
-            >
+            <p className={`text-2xl font-bold ${pct >= PE_DE_MEIA_THRESHOLD ? "text-green-600" : "text-red-600"}`}>
               {pct}%
             </p>
             <p className="text-xs text-muted-foreground">Frequência</p>
@@ -220,7 +173,6 @@ export default function StudentAttendance() {
         </Card>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-2">
         <select
           value={subjectFilter}
@@ -244,40 +196,33 @@ export default function StudentAttendance() {
         />
       </div>
 
-      {/* Records */}
       <div className="space-y-1.5">
         {filtered.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-6">
+          <p className="py-6 text-center text-sm text-muted-foreground">
             Nenhum registro encontrado
           </p>
         )}
         {filtered.map((r, i) => {
           const statusIcon =
-            r.status === "present"
-              ? "✅"
-              : r.status === "justified"
-                ? "📋"
-                : "❌";
+            r.status === "present" ? "✅" : r.status === "justified" ? "📋" : "❌";
           return (
             <div
               key={i}
               className="flex items-center justify-between rounded-lg border bg-card px-4 py-3"
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex min-w-0 items-center gap-3">
                 <span className="text-base">{statusIcon}</span>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{r.subject}</p>
+                  <p className="truncate text-sm font-medium">{r.subject}</p>
                   <p className="text-xs text-muted-foreground">
                     {r.date
-                      ? new Date(r.date + "T00:00:00").toLocaleDateString(
-                          "pt-BR"
-                        )
+                      ? new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR")
                       : "—"}
                   </p>
                 </div>
               </div>
               <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   r.status === "present"
                     ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                     : r.status === "justified"

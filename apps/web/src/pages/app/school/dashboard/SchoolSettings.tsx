@@ -2,21 +2,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import {
-  AlertTriangle,
-  Calendar,
-  Download,
-  Plus,
-  Settings,
-  Users,
-} from "lucide-react";
+import type { RegistryRow } from "@/pages/shared/Types";
+import { Calendar, CheckCircle, Plus, Settings, UserCheck, UserX, Users } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
+
+const ROLE_LABELS: Record<string, string> = {
+  teacher: "Professor",
+  student: "Aluno",
+  guardian: "Responsável",
+  school_staff: "Gestão",
+  admin: "Admin",
+};
+
+const ROLE_FILTERS = [
+  { value: "all", label: "Todos" },
+  { value: "teacher", label: "Professores" },
+  { value: "student", label: "Alunos" },
+  { value: "guardian", label: "Responsáveis" },
+];
 
 export default function SchoolSettings() {
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+  const schoolId = mySchools?.[0]?.schoolId;
 
   const { data: schoolYears } = trpc.registry.list.useQuery(
     {
@@ -26,46 +34,36 @@ export default function SchoolSettings() {
     },
     { enabled: !!schoolId }
   );
-  const { data: users } = trpc.registry.list.useQuery(
-    {
-      entity: "users" as const,
-      filters: schoolId ? { schoolId } : {},
-      limit: 500,
-    },
+  const { data: users } = trpc.school.users.useQuery(
+    { schoolId: schoolId! },
     { enabled: !!schoolId }
   );
 
   const [showCreateYear, setShowCreateYear] = useState(false);
-  const [yearForm, setYearForm] = useState({
-    year: "",
-    startDate: "",
-    endDate: "",
-  });
-  const [userFilter, setUserFilter] = useState<string>("all");
-  const [lgpdStudentSearch, setLgpdStudentSearch] = useState("");
-  const [showDeleted, setShowDeleted] = useState(false);
+  const [yearForm, setYearForm] = useState({ year: "", startDate: "", endDate: "" });
+  const [userFilter, setUserFilter] = useState("all");
+  const [userSearch, setUserSearch] = useState("");
 
   const createYear = trpc.registry.create.useMutation();
   const updateUser = trpc.registry.update.useMutation();
-  const restoreRow = trpc.registry.restore.useMutation();
-
-  const { data: deletedRecords } = trpc.registry.listDeleted.useQuery(
-    { entity: "students" as const, limit: 50 },
-    { enabled: showDeleted }
-  );
 
   const yearList = (schoolYears ?? []) as RegistryRow[];
   const userList = (users ?? []) as RegistryRow[];
 
-  const filteredUsers = userList.filter(u => {
-    if (userFilter === "all") return true;
-    return String(u.role) === userFilter;
-  });
+  const filteredUsers = userList
+    .filter(u => userFilter === "all" || String(u.role) === userFilter)
+    .filter(u => {
+      if (!userSearch) return true;
+      const q = userSearch.toLowerCase();
+      return (
+        String(u.name || "").toLowerCase().includes(q) ||
+        String(u.email || "").toLowerCase().includes(q)
+      );
+    });
 
   async function handleCreateYear(e: FormEvent) {
     e.preventDefault();
     if (!schoolId) return;
-
     try {
       await createYear.mutateAsync({
         entity: "schoolYears" as const,
@@ -121,7 +119,7 @@ export default function SchoolSettings() {
         Configurações
       </h2>
 
-      {/* School Year Management */}
+      {/* ── Anos Letivos ── */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -135,7 +133,7 @@ export default function SchoolSettings() {
               className="bg-red-brand hover:bg-red-700"
             >
               <Plus className="mr-1 size-3" />
-              Novo Ano Letivo
+              Novo
             </Button>
           </div>
         </CardHeader>
@@ -149,26 +147,20 @@ export default function SchoolSettings() {
                 <Input
                   placeholder="Ano (ex: 2026) *"
                   value={yearForm.year}
-                  onChange={e =>
-                    setYearForm(p => ({ ...p, year: e.target.value }))
-                  }
+                  onChange={e => setYearForm(p => ({ ...p, year: e.target.value }))}
                   required
                 />
                 <Input
                   type="date"
                   placeholder="Início"
                   value={yearForm.startDate}
-                  onChange={e =>
-                    setYearForm(p => ({ ...p, startDate: e.target.value }))
-                  }
+                  onChange={e => setYearForm(p => ({ ...p, startDate: e.target.value }))}
                 />
                 <Input
                   type="date"
                   placeholder="Fim"
                   value={yearForm.endDate}
-                  onChange={e =>
-                    setYearForm(p => ({ ...p, endDate: e.target.value }))
-                  }
+                  onChange={e => setYearForm(p => ({ ...p, endDate: e.target.value }))}
                 />
               </div>
               <div className="flex gap-2">
@@ -196,55 +188,68 @@ export default function SchoolSettings() {
           )}
 
           {yearList.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Nenhum ano letivo cadastrado
-            </p>
+            <p className="text-sm text-muted-foreground">Nenhum ano letivo cadastrado</p>
           )}
-          {yearList.map(year => {
-            const isActive = year.isActive === 1 || year.isCurrent === 1;
-            return (
-              <div
-                key={String(year.id)}
-                className="flex items-center justify-between rounded-lg border bg-card px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium">
-                    {String(year.year || year.label)}
-                    {isActive && (
-                      <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                        Ativo
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {year.startDate
-                      ? `${new Date(String(year.startDate)).toLocaleDateString("pt-BR")} — `
-                      : ""}
-                    {year.endDate
-                      ? new Date(String(year.endDate)).toLocaleDateString(
-                          "pt-BR"
-                        )
-                      : "Em andamento"}
-                  </p>
+
+          <div className="space-y-2">
+            {yearList.map(year => {
+              const isActive = year.isActive === 1 || year.isCurrent === 1;
+              return (
+                <div
+                  key={String(year.id)}
+                  className="flex items-center justify-between rounded-lg border bg-card px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex size-8 items-center justify-center rounded-full ${
+                        isActive ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                      }`}
+                    >
+                      <Calendar
+                        className={`size-4 ${
+                          isActive ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        {String(year.year || year.label)}
+                        {isActive && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            Ativo
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {year.startDate
+                          ? new Date(String(year.startDate)).toLocaleDateString("pt-BR")
+                          : "Início não definido"}
+                        {" — "}
+                        {year.endDate
+                          ? new Date(String(year.endDate)).toLocaleDateString("pt-BR")
+                          : "Em andamento"}
+                      </p>
+                    </div>
+                  </div>
+                  {isActive && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-amber-600 border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/20"
+                      onClick={() => handleCloseYear(year.id as number)}
+                      disabled={updateUser.isPending}
+                    >
+                      Encerrar
+                    </Button>
+                  )}
                 </div>
-                {isActive && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-amber-600 hover:bg-amber-50"
-                    onClick={() => handleCloseYear(year.id as number)}
-                    disabled={updateUser.isPending}
-                  >
-                    Encerrar
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 
-      {/* User Management */}
+      {/* ── Gerenciar Usuários ── */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -253,66 +258,93 @@ export default function SchoolSettings() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Role filter */}
-          <div className="flex flex-wrap gap-1">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
+            <Input
+              placeholder="Buscar por nome ou email..."
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+              className="flex-1 min-w-[180px]"
+            />
+            <div className="flex flex-wrap gap-1">
+              {ROLE_FILTERS.map(f => (
+                <button
+                  key={f.value}
+                  onClick={() => setUserFilter(f.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    userFilter === f.value
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              { value: "all", label: "Todos" },
-              { value: "teacher", label: "Professores" },
-              { value: "student", label: "Alunos" },
-              { value: "guardian", label: "Responsáveis" },
-            ].map(f => (
-              <button
-                key={f.value}
-                onClick={() => setUserFilter(f.value)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  userFilter === f.value
-                    ? "bg-muted text-foreground"
-                    : "bg-secondary text-muted-foreground hover:bg-muted/50"
-                }`}
-              >
-                {f.label}
-              </button>
+              { label: "Total", count: userList.length, color: "text-foreground" },
+              { label: "Professores", count: userList.filter(u => u.role === "teacher").length, color: "text-blue-600" },
+              { label: "Alunos", count: userList.filter(u => u.role === "student").length, color: "text-green-600" },
+              { label: "Responsáveis", count: userList.filter(u => u.role === "guardian").length, color: "text-amber-600" },
+            ].map(item => (
+              <div key={item.label} className="rounded-lg bg-muted/50 p-2.5 text-center">
+                <p className={`text-xl font-bold ${item.color}`}>{item.count}</p>
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+              </div>
             ))}
           </div>
 
+          {/* User list */}
           {filteredUsers.length === 0 && (
-            <p className="text-sm text-muted-foreground">
+            <p className="py-2 text-center text-sm text-muted-foreground">
               Nenhum usuário encontrado
             </p>
           )}
-          <div className="space-y-1">
-            {filteredUsers.slice(0, 50).map(u => {
-              const isActive = u.isActive === 1;
+          <div className="space-y-1.5 max-h-96 overflow-y-auto">
+            {filteredUsers.slice(0, 100).map(u => {
+              const isActive = u.isActive !== 0;
               const role = String(u.role);
-              const roleLabel =
-                role === "teacher"
-                  ? "Professor"
-                  : role === "student"
-                    ? "Aluno"
-                    : role === "guardian"
-                      ? "Responsável"
-                      : role === "school" || role === "admin"
-                        ? "Escola"
-                        : role;
+              const roleLabel = ROLE_LABELS[role] ?? role;
               return (
                 <div
                   key={String(u.id)}
-                  className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2"
                 >
-                  <div>
-                    <span className="font-medium">{String(u.name)}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {String(u.email || "")}
-                    </span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                        isActive ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                      }`}
+                    >
+                      {isActive ? (
+                        <UserCheck className="size-3.5 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <UserX className="size-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{String(u.name)}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {String(u.email || "")}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <span className="hidden sm:block rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                       {roleLabel}
                     </span>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className={`text-xs ${isActive ? "text-red-500 hover:text-red-600" : "text-green-600 hover:text-green-700"}`}
+                      className={`h-7 px-2 text-xs ${
+                        isActive
+                          ? "text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                          : "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/20"
+                      }`}
                       onClick={() => handleToggleUser(u.id as number, isActive)}
                       disabled={updateUser.isPending}
                     >
@@ -322,178 +354,22 @@ export default function SchoolSettings() {
                 </div>
               );
             })}
-            {filteredUsers.length > 50 && (
-              <p className="text-xs text-muted-foreground text-center">
-                Mostrando 50 de {filteredUsers.length} usuários
+            {filteredUsers.length > 100 && (
+              <p className="text-xs text-center text-muted-foreground pt-1">
+                Mostrando 100 de {filteredUsers.length} usuários
               </p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Danger Zone */}
-      <Card className="border-red-200 dark:border-red-800">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2 text-red-600">
-            <AlertTriangle className="size-4" />
-            Zona de Perigo
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Ações irreversíveis. Dados excluídos não podem ser recuperados.
-          </p>
-          <div className="space-y-2">
-            {/* LGPD Export */}
-            <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50/50 px-4 py-3 dark:bg-blue-950/10">
-              <div>
-                <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                  Exportar dados do aluno (LGPD Art. 18)
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Download de todos os dados de um aluno em formato JSON
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                onClick={async () => {
-                  if (!schoolId) return;
-                  const search = lgpdStudentSearch.trim();
-                  if (!search) {
-                    toast.error("Busque um aluno pelo nome ou matrícula");
-                    return;
-                  }
-                  try {
-                    const result = await trpc.school.exportStudentData.query({
-                      schoolId,
-                      studentId: Number(search),
-                    });
-                    const blob = new Blob([JSON.stringify(result, null, 2)], {
-                      type: "application/json",
-                    });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `lgpd-aluno-${search}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    toast.success("Dados exportados!");
-                  } catch {
-                    toast.error("Aluno não encontrado ou sem acesso");
-                  }
-                }}
-              >
-                <Download className="mr-1 size-4" /> Exportar
-              </Button>
-            </div>
-
-            {/* Soft-deleted records */}
-            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-3 dark:bg-amber-950/10">
-              <div>
-                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                  Registros deletados (soft-delete)
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Visualize e restaure registros removidos recentemente
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-amber-200 text-amber-600 hover:bg-amber-50"
-                onClick={() => setShowDeleted(!showDeleted)}
-              >
-                {showDeleted ? "Ocultar" : "Ver Deletados"}
-              </Button>
-            </div>
-
-            {showDeleted &&
-              ((deletedRecords as RegistryRow[]) ?? []).length > 0 && (
-                <div className="space-y-1 mt-2">
-                  {((deletedRecords as RegistryRow[] | undefined) ?? []).map(
-                    r => (
-                      <div
-                        key={String(r.id)}
-                        className="flex items-center justify-between rounded-md bg-amber-50/30 px-3 py-2 text-sm"
-                      >
-                        <div>
-                          <span className="font-medium">{String(r.name)}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            Deletado em:{" "}
-                            {r.deletedAt
-                              ? new Date(
-                                  String(r.deletedAt)
-                                ).toLocaleDateString("pt-BR")
-                              : ""}
-                          </span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-xs text-green-600 hover:text-green-700"
-                          onClick={() => {
-                            restoreRow.mutate(
-                              {
-                                entity: "students" as const,
-                                id: r.id as number,
-                              },
-                              {
-                                onSuccess: () => {
-                                  toast.success("Registro restaurado!");
-                                },
-                                onError: () => toast.error("Erro ao restaurar"),
-                              }
-                            );
-                          }}
-                          disabled={restoreRow.isPending}
-                        >
-                          Restaurar
-                        </Button>
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
-
-            <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 dark:bg-red-950/10">
-              <div>
-                <p className="text-sm font-medium text-red-600">
-                  Exportar dados da escola
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Download de todos os dados em formato JSON (LGPD)
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-200 text-red-600 hover:bg-red-50"
-              >
-                Exportar
-              </Button>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 dark:bg-red-950/10">
-              <div>
-                <p className="text-sm font-medium text-red-600">
-                  Redefinir senhas em massa
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Gera novas credenciais temporárias para todos os usuários
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-200 text-red-600 hover:bg-red-50"
-              >
-                Redefinir
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── Confirmação visual ── */}
+      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-800 dark:bg-green-950/20">
+        <CheckCircle className="size-4 text-green-600 shrink-0" />
+        <p className="text-sm text-green-700 dark:text-green-400">
+          Alterações são salvas automaticamente. Dados protegidos conforme LGPD.
+        </p>
+      </div>
     </div>
   );
 }

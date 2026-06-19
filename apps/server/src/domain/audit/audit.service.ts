@@ -33,7 +33,7 @@ export class AuditService {
       action?: string;
     }
   ) {
-    const filterObj: Record<string, unknown> = { schoolId };
+    const filterObj: Record<string, string | number | boolean | null | undefined> = { schoolId };
     if (filters?.userId) filterObj.userId = filters.userId;
     if (filters?.entity) filterObj.entity = filters.entity;
     if (filters?.action) filterObj.action = filters.action;

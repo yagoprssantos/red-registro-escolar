@@ -312,25 +312,44 @@ export class NotificationService {
           // For simplicity in MVP, we'll notify all users (can be optimized later)
           // TODO: Implement proper school-wide notification
         } else if (targetType === "school" && targetRefId !== null) {
-          // Notify all active users in the specific school
+          // Notify all users associated with this school
           try {
-            // Get all user-school links for this school
             const { listEntityRows } = await import("../../db");
+
+            // Teachers in this school
+            const teachers = await listEntityRows("teachers", {
+              filters: { schoolId: targetRefId },
+            });
+            for (const t of teachers) {
+              const teacher = t as Record<string, unknown>;
+              if (teacher.userId) userIdsToNotify.push(teacher.userId as number);
+            }
+
+            // Guardians in this school
+            const guardians = await listEntityRows("guardians", {
+              filters: { schoolId: targetRefId },
+            });
+            for (const g of guardians) {
+              const guardian = g as Record<string, unknown>;
+              if (guardian.userId) userIdsToNotify.push(guardian.userId as number);
+            }
+
+            // Students with userId in this school
+            const students = await listEntityRows("students", {
+              filters: { schoolId: targetRefId },
+            });
+            for (const s of students) {
+              const student = s as Record<string, unknown>;
+              if (student.userId) userIdsToNotify.push(student.userId as number);
+            }
+
+            // School staff / coordinators via userSchools
             const userSchools = await listEntityRows("userSchools", {
               filters: { schoolId: targetRefId },
             });
-
-            // Get user IDs from those links
             for (const us of userSchools) {
               const userSchool = us as Record<string, unknown>;
-              const userId = userSchool.userId as number;
-
-              // Get the user to confirm they exist
-              const { getEntityById } = await import("../../db");
-              const user = await getEntityById("users", userId);
-              if (user) {
-                userIdsToNotify.push(userId);
-              }
+              userIdsToNotify.push(userSchool.userId as number);
             }
           } catch (error) {
             console.error(

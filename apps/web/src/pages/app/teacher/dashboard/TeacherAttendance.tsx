@@ -1,22 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { ArrowLeft, CheckCircle2, History, XCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 type Tab = "new" | "history";
 
 export default function TeacherAttendance() {
   const [tab, setTab] = useState<Tab>("new");
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [selectedClassSubjectId, setSelectedClassSubjectId] = useState<number | null>(null);
+  const [step, setStep] = useState<1 | 2>(1);
   const [sessionDate, setSessionDate] = useState(
     new Date().toISOString().split("T")[0]
-  );
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(
-    null
   );
   const [attendanceMap, setAttendanceMap] = useState<
     Record<number, "present" | "absent">
@@ -40,22 +38,14 @@ export default function TeacherAttendance() {
     limit: 500,
   });
 
-  // Subjects for selected class
-  const { data: classSubjects } = trpc.registry.list.useQuery(
-    {
-      entity: "classSubjects" as const,
-      filters: selectedClassId ? { classId: selectedClassId } : {},
-      limit: 50,
-    },
-    { enabled: !!selectedClassId }
-  );
-  const subjectList = (classSubjects ?? []) as RegistryRow[];
-
   // History: past sessions
   const { data: pastSessions } = trpc.registry.list.useQuery(
     {
       entity: "classSessions" as const,
-      filters: selectedClassId ? { classId: selectedClassId } : {},
+      filters:
+        selectedClassSubjectId != null
+          ? { classSubjectId: selectedClassSubjectId }
+          : {},
       limit: 50,
       orderBy: "lessonDate",
       orderDirection: "desc",
@@ -76,6 +66,12 @@ export default function TeacherAttendance() {
     })
     .filter(Boolean) as RegistryRow[];
 
+  function selectClass(cls: RegistryRow) {
+    setSelectedClassId(cls.id as number);
+    setSelectedClassSubjectId(cls.classSubjectId as number);
+    setStep(2);
+  }
+
   function toggleAttendance(studentId: number) {
     setAttendanceMap(prev => ({
       ...prev,
@@ -83,29 +79,34 @@ export default function TeacherAttendance() {
     }));
   }
 
+  function getSelectedClassName() {
+    const cls = classList.find(c => c.id === selectedClassId);
+    return cls ? String(cls.displayName || cls.gradeLabel || cls.name || "") : "";
+  }
+
   async function handleSave(e: FormEvent) {
     e.preventDefault();
-    if (!selectedClassId || !selectedSubjectId) return;
+    if (!selectedClassId || !selectedClassSubjectId) return;
 
-    const teacherId = (teacherProfile as RegistryRow)?.id as number;
+    const teacherId = teacherProfile?.id;
     if (!teacherId) {
       toast.error("Perfil de professor não encontrado");
       return;
     }
 
     try {
-      // 1. Create class session first
+      // 1. Create class session
       const sessionResult = await createRecord.mutateAsync({
         entity: "classSessions" as const,
         data: {
-          classSubjectId: selectedSubjectId,
+          classSubjectId: selectedClassSubjectId,
           teacherId,
           lessonDate: sessionDate,
         },
       });
       const sessionId = (sessionResult as RegistryRow)?.id as number;
 
-      // 2. Create attendance records for each student
+      // 2. Create attendance records
       for (const [studentIdStr, status] of Object.entries(attendanceMap)) {
         const studentId = Number(studentIdStr);
         try {
@@ -115,11 +116,7 @@ export default function TeacherAttendance() {
             status,
           });
         } catch (err) {
-          // Continue even if one fails (e.g., duplicate)
-          console.warn(
-            `Attendance record failed for student ${studentId}:`,
-            err
-          );
+          console.warn(`Attendance record failed for student ${studentId}:`, err);
         }
       }
 
@@ -127,19 +124,15 @@ export default function TeacherAttendance() {
       setStep(1);
       setAttendanceMap({});
       setSelectedClassId(null);
-      setSelectedSubjectId(null);
+      setSelectedClassSubjectId(null);
     } catch (error) {
       toast.error("Erro ao registrar chamada");
       console.error(error);
     }
   }
 
-  const presentCount = Object.values(attendanceMap).filter(
-    s => s === "present"
-  ).length;
-  const absentCount = Object.values(attendanceMap).filter(
-    s => s === "absent"
-  ).length;
+  const presentCount = Object.values(attendanceMap).filter(s => s === "present").length;
+  const absentCount = Object.values(attendanceMap).filter(s => s === "absent").length;
 
   return (
     <div className="space-y-6">
@@ -170,6 +163,7 @@ export default function TeacherAttendance() {
 
       {tab === "new" && (
         <>
+          {/* Step 1: Select class */}
           {step === 1 && (
             <Card>
               <CardHeader>
@@ -184,14 +178,11 @@ export default function TeacherAttendance() {
                 {classList.map(cls => (
                   <button
                     key={String(cls.id)}
-                    onClick={() => {
-                      setSelectedClassId(cls.id as number);
-                      setStep(2);
-                    }}
+                    onClick={() => selectClass(cls)}
                     className="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-muted min-h-[44px]"
                   >
                     <span className="text-sm font-medium">
-                      {String(cls.name || cls.gradeLabel)}
+                      {String(cls.displayName || cls.gradeLabel || cls.name || `Turma ${cls.id}`)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {String(
@@ -210,152 +201,106 @@ export default function TeacherAttendance() {
             </Card>
           )}
 
+          {/* Step 2: Date + attendance list */}
           {step === 2 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurar sessão</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Data da aula
-                  </label>
-                  <input
-                    type="date"
-                    value={sessionDate}
-                    max={new Date().toISOString().split("T")[0]}
-                    onChange={e => setSessionDate(e.target.value)}
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Disciplina
-                  </label>
-                  {subjectList.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhuma disciplina vinculada a esta turma
-                    </p>
-                  ) : (
-                    <select
-                      value={selectedSubjectId ?? ""}
-                      onChange={e =>
-                        setSelectedSubjectId(Number(e.target.value))
-                      }
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {getSelectedClassName()}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Data da aula
+                    </label>
+                    <input
+                      type="date"
+                      value={sessionDate}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={e => setSessionDate(e.target.value)}
                       className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Selecione...</option>
-                      {subjectList.map(s => (
-                        <option key={String(s.id)} value={String(s.id)}>
-                          {String(
-                            s.subjectName || s.name || `Disciplina ${s.id}`
-                          )}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setStep(1)}>
-                    <ArrowLeft className="mr-1 size-4" />
-                    Voltar
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setAttendanceMap(
-                        Object.fromEntries(
-                          enrolledStudents.map(s => [
-                            s.id as number,
-                            "present" as const,
-                          ])
-                        )
-                      );
-                      setStep(3);
-                    }}
-                    disabled={
-                      !selectedSubjectId || enrolledStudents.length === 0
-                    }
-                  >
-                    Próximo — Lista de alunos
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {step === 3 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Chamada — {sessionDate}</CardTitle>
-                <div className="flex gap-3 text-sm">
-                  <span className="font-medium text-green-600">
-                    ✓ {presentCount}
-                  </span>
-                  <span className="font-medium text-red-500">
-                    ✗ {absentCount}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSave} className="space-y-2">
-                  {enrolledStudents.map(student => {
-                    const status =
-                      attendanceMap[student.id as number] ?? "present";
-                    return (
-                      <button
-                        key={String(student.id)}
-                        type="button"
-                        onClick={() => toggleAttendance(student.id as number)}
-                        className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 transition-colors min-h-[44px] ${
-                          status === "present"
-                            ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-                            : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
-                        }`}
-                      >
-                        <span className="text-sm font-medium text-foreground">
-                          {String(student.name)}
-                        </span>
-                        {status === "present" ? (
-                          <CheckCircle2 className="size-5 text-green-600" />
-                        ) : (
-                          <XCircle className="size-5 text-red-500" />
-                        )}
-                      </button>
-                    );
-                  })}
-                  <div className="pt-4 flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setStep(2)}
-                    >
-                      <ArrowLeft className="mr-1 size-4" />
-                      Voltar
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="bg-red-brand hover:bg-red-700"
-                      disabled={
-                        attendanceCreate.isPending || createRecord.isPending
-                      }
-                    >
-                      {attendanceCreate.isPending || createRecord.isPending
-                        ? "Salvando..."
-                        : "Salvar Chamada"}
-                    </Button>
+                    />
                   </div>
-                </form>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Chamada — {sessionDate}</CardTitle>
+                  <div className="flex gap-3 text-sm">
+                    <span className="font-medium text-green-600">✓ {presentCount}</span>
+                    <span className="font-medium text-red-500">✗ {absentCount}</span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {enrolledStudents.length === 0 && (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                      Nenhum aluno matriculado nesta turma
+                    </p>
+                  )}
+                  <form onSubmit={handleSave} className="space-y-2">
+                    {enrolledStudents.map(student => {
+                      const status = attendanceMap[student.id as number] ?? "present";
+                      return (
+                        <button
+                          key={String(student.id)}
+                          type="button"
+                          onClick={() => toggleAttendance(student.id as number)}
+                          className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 transition-colors min-h-[44px] ${
+                            status === "present"
+                              ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
+                              : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                          }`}
+                        >
+                          <span className="text-sm font-medium text-foreground">
+                            {String(student.name)}
+                          </span>
+                          {status === "present" ? (
+                            <CheckCircle2 className="size-5 text-green-600" />
+                          ) : (
+                            <XCircle className="size-5 text-red-500" />
+                          )}
+                        </button>
+                      );
+                    })}
+                    <div className="pt-4 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setStep(1);
+                          setAttendanceMap({});
+                        }}
+                      >
+                        <ArrowLeft className="mr-1 size-4" />
+                        Voltar
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="bg-red-brand hover:bg-red-700"
+                        disabled={
+                          attendanceCreate.isPending ||
+                          createRecord.isPending ||
+                          enrolledStudents.length === 0
+                        }
+                      >
+                        {attendanceCreate.isPending || createRecord.isPending
+                          ? "Salvando..."
+                          : "Salvar Chamada"}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </>
           )}
         </>
       )}
 
       {tab === "history" && (
         <div className="space-y-4">
-          {/* Class selector for history */}
           {classList.length > 0 && (
             <div>
               <label className="mb-1 block text-sm font-medium">
@@ -363,17 +308,18 @@ export default function TeacherAttendance() {
               </label>
               <select
                 value={selectedClassId ?? ""}
-                onChange={e =>
-                  setSelectedClassId(
-                    e.target.value ? Number(e.target.value) : null
-                  )
-                }
+                onChange={e => {
+                  const id = e.target.value ? Number(e.target.value) : null;
+                  setSelectedClassId(id);
+                  const cls = classList.find(c => c.id === id);
+                  setSelectedClassSubjectId(cls ? (cls.classSubjectId as number) : null);
+                }}
                 className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
               >
                 <option value="">Todas as turmas</option>
                 {classList.map(cls => (
                   <option key={String(cls.id)} value={String(cls.id)}>
-                    {String(cls.name || cls.gradeLabel)}
+                    {String(cls.displayName || cls.gradeLabel || cls.name)}
                   </option>
                 ))}
               </select>
@@ -391,21 +337,18 @@ export default function TeacherAttendance() {
             </Card>
           )}
 
-          {(pastSessions ?? []).map((session: RegistryRow) => (
+          {((pastSessions ?? []) as RegistryRow[]).map(session => (
             <Card key={String(session.id)}>
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">
-                      Sessão{" "}
                       {session.lessonDate
-                        ? new Date(
-                            String(session.lessonDate)
-                          ).toLocaleDateString("pt-BR")
+                        ? new Date(String(session.lessonDate)).toLocaleDateString("pt-BR")
                         : "—"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Disciplina: {String(session.subjectName || "—")}
+                      {getSelectedClassName() || "Turma não selecionada"}
                     </p>
                   </div>
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">

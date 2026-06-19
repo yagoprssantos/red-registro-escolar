@@ -1,9 +1,26 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import {
+  MAX_REGISTRY_LIMIT,
+  type Student,
+  type ClassSession,
+  type ClassSubject,
+  type Teacher,
+  type AttendanceRecord,
+  type StudentPerformance,
+} from "@/lib/registry-types";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
+
+type AttendanceEnrichedRow = {
+  id: number;
+  status: "present" | "absent" | "justified";
+  justificationId?: number | null;
+  sessionDate: string | null;
+  subjectName: string;
+  teacherName: string | null;
+};
 
 export default function GuardianAttendance() {
   const { data: students } = trpc.profiles.guardian.students.useQuery();
@@ -11,55 +28,58 @@ export default function GuardianAttendance() {
     null
   );
 
-  const studentList = (students ?? []) as RegistryRow[];
+  const studentList = (students ?? []) as Student[];
 
   const { data: performance } =
     trpc.profiles.guardian.studentPerformance.useQuery(
       { studentId: selectedStudentId! },
       { enabled: !!selectedStudentId }
     );
-  const perf = performance as RegistryRow | null;
+  const perf = performance as StudentPerformance | null;
 
-  // Get attendance records for selected student
-  const { data: records } = trpc.registry.list.useQuery({
-    entity: "attendanceRecords" as const,
-    limit: 500,
-  });
+  // Get attendance records for selected student (filtered server-side)
+  const { data: records } = trpc.registry.list.useQuery(
+    {
+      entity: "attendanceRecords" as const,
+      filters: selectedStudentId ? { studentId: selectedStudentId } : {},
+      limit: MAX_REGISTRY_LIMIT,
+    },
+    { enabled: !!selectedStudentId }
+  );
   const { data: sessions } = trpc.registry.list.useQuery({
     entity: "classSessions" as const,
-    limit: 500,
+    limit: MAX_REGISTRY_LIMIT,
   });
   const { data: classSubjects } = trpc.registry.list.useQuery({
     entity: "classSubjects" as const,
-    limit: 100,
+    limit: Math.min(100, MAX_REGISTRY_LIMIT),
   });
   const { data: teachers } = trpc.registry.list.useQuery({
     entity: "teachers" as const,
-    limit: 200,
+    limit: Math.min(200, MAX_REGISTRY_LIMIT),
   });
 
-  const allRecords = (records ?? []) as RegistryRow[];
-  const sessionList = (sessions ?? []) as RegistryRow[];
-  const subjectList = (classSubjects ?? []) as RegistryRow[];
-  const teacherList = (teachers ?? []) as RegistryRow[];
+  const allRecords = (records ?? []) as unknown as AttendanceRecord[];
+  const sessionList = (sessions ?? []) as unknown as ClassSession[];
+  const subjectList = (classSubjects ?? []) as unknown as ClassSubject[];
+  const teacherList = (teachers ?? []) as unknown as Teacher[];
 
-  // Filter records for selected student
-  const studentRecords = allRecords.filter(
-    r => r.studentId === selectedStudentId
-  );
+  const studentRecords = allRecords;
 
   // Enrich with session, subject, and teacher info
-  const enriched = studentRecords.map(r => {
+  const enriched: AttendanceEnrichedRow[] = studentRecords.map(r => {
     const session = sessionList.find(s => s.id === r.classSessionId);
     const subject = subjectList.find(s => s.id === session?.classSubjectId);
     const teacher = teacherList.find(t => t.id === session?.teacherId);
     return {
-      ...r,
+      id: r.id,
+      status: r.status,
+      justificationId: r.justificationId ?? null,
       subjectName: subject
-        ? String(subject.subjectName || subject.name || "—")
+        ? subject.subjectName || subject.name || "—"
         : "—",
-      teacherName: teacher ? String(teacher.name) : null,
-      sessionDate: session?.lessonDate ? String(session.lessonDate) : null,
+      teacherName: teacher?.name ?? null,
+      sessionDate: session?.lessonDate ?? null,
     };
   });
 

@@ -1,23 +1,24 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { Notification, School } from "@/pages/shared/Types";
 import { Bell, Check } from "lucide-react";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
-
 type Filter = "all" | "unread";
 
 export default function GuardianCommunications() {
   const [filter, setFilter] = useState<Filter>("all");
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
-  const schoolId = (mySchools?.[0] as RegistryRow)?.id as number | undefined;
+
+  const schoolId = (mySchools?.[0] as School | undefined)?.id;
 
   const { data: communications } = trpc.communications.forUser.useQuery(
     { schoolId: schoolId! },
     { enabled: !!schoolId }
   );
+
   const markRead = trpc.communications.markRead.useMutation();
 
-  const allComms = (communications ?? []) as RegistryRow[];
+  const allComms = (communications ?? []) as Notification[];
   const filtered =
     filter === "unread" ? allComms.filter(c => !c.readAt) : allComms;
 
@@ -25,6 +26,7 @@ export default function GuardianCommunications() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Comunicados</h2>
+
         <div className="flex gap-1 rounded-lg bg-muted p-1">
           <button
             onClick={() => setFilter("all")}
@@ -82,11 +84,10 @@ export default function GuardianCommunications() {
                     : ""}
                 </p>
               </div>
+
               {!comm.readAt && (
                 <button
-                  onClick={() =>
-                    markRead.mutate({ communicationId: comm.id as number })
-                  }
+                  onClick={() => markRead.mutate({ communicationId: comm.id })}
                   className="flex items-center gap-1 rounded-lg border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted"
                   disabled={markRead.isPending}
                 >

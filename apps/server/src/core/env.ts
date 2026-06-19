@@ -44,6 +44,9 @@ const bootstrapDefaultAdmins =
   (process.env.AUTH_BOOTSTRAP_DEFAULT_ADMINS ?? "false").toLowerCase() ===
   "true";
 
+const bootstrapSeedUsers =
+  (process.env.AUTH_BOOTSTRAP_SEED_USERS ?? "false").toLowerCase() === "true";
+
 const defaultAdminPassword = process.env.AUTH_DEFAULT_ADMIN_PASSWORD ?? "";
 
 export const ENV = {
@@ -61,7 +64,12 @@ export const ENV = {
   supabaseAnonKey: rawSupabaseAnonKey,
   supabaseServiceRoleKey: rawSupabaseServiceRoleKey,
   bootstrapDefaultAdmins,
+  bootstrapSeedUsers,
   defaultAdminPassword,
+  seedPasswordSchool: process.env.SEED_PASSWORD_SCHOOL?.trim() ?? "",
+  seedPasswordTeacher: process.env.SEED_PASSWORD_TEACHER?.trim() ?? "",
+  seedPasswordStudent: process.env.SEED_PASSWORD_STUDENT?.trim() ?? "",
+  seedPasswordGuardian: process.env.SEED_PASSWORD_GUARDIAN?.trim() ?? "",
   defaultAdminSchoolName:
     process.env.AUTH_DEFAULT_SCHOOL_NAME?.trim() || "Escola RED Referencia",
   defaultAdminSchoolInstitutionEmail:

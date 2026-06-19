@@ -14,7 +14,7 @@ import { createAssessmentScoreSchema } from "./grades.schema";
 
 export const gradesRouter = router({
   // Create or update (upsert) assessment score
-  record: protectedProcedure
+  create: protectedProcedure
     .input(createAssessmentScoreSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) {

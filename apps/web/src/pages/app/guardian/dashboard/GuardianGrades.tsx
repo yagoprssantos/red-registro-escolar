@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import type { RegistryRow } from "@/pages/shared/Types";
 import { useState } from "react";
-import type { RegistryRow } from "../../../shared/DashboardShell";
 
 export default function GuardianGrades() {
   const { data: students } = trpc.profiles.guardian.students.useQuery();
