@@ -1,4 +1,5 @@
 import BrandLogo from "@/components/BrandLogo";
+import BrandTitleLogo from "@/components/BrandTitleLogo";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/core/hooks/useAuth";
@@ -22,7 +23,6 @@ import {
   ChevronRight,
   LayoutGrid,
   LogOut,
-  School,
   Settings,
   Users,
   X,
@@ -607,8 +607,10 @@ export default function DashboardShell() {
                 </svg>
               </button>
 
-              {/* Brand logo */}
-              <BrandLogo size="compact" />
+              {/* Brand logo — desktop only */}
+              <div className="hidden md:block">
+                <BrandLogo size="compact" />
+              </div>
 
               {/* Divider */}
               <div className="hidden h-6 w-px bg-border md:block" />
@@ -868,16 +870,7 @@ export default function DashboardShell() {
             >
               {/* Drawer header */}
               <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`flex size-8 items-center justify-center rounded-lg bg-gradient-to-br ${accentGradient} shadow-sm`}
-                  >
-                    <School className="size-4 text-white" />
-                  </div>
-                  <span className="font-heading text-sm font-bold tracking-tight">
-                    RED
-                  </span>
-                </div>
+                <BrandTitleLogo size="compact" />
                 <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted/50"
