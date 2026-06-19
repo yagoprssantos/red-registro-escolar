@@ -34,7 +34,6 @@ export function NotificationBell() {
     );
 
   const items = (notifications ?? []) as unknown as NotificationItem[];
-
   const unreadCount = items.filter(n => !n.isRead).length;
 
   const markRead = trpc.registry.notifications.markRead.useMutation({
@@ -47,12 +46,14 @@ export function NotificationBell() {
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
+      const target = e.target as Node;
+
       if (
         open &&
         panelRef.current &&
-        !panelRef.current.contains(e.target as Node) &&
+        !panelRef.current.contains(target) &&
         bellRef.current &&
-        !bellRef.current.contains(e.target as Node)
+        !bellRef.current.contains(target)
       ) {
         setOpen(false);
       }
@@ -77,7 +78,7 @@ export function NotificationBell() {
         ref={bellRef}
         className="relative flex items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         aria-label={`${unreadCount} notificações não lidas`}
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen(v => !v)}
       >
         <Bell className="size-5" />
         {unreadCount > 0 && (
@@ -90,25 +91,35 @@ export function NotificationBell() {
       {open && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border bg-card shadow-lg"
+          className="
+            fixed inset-x-2 top-16 z-50
+            max-h-[calc(100vh-5rem)] overflow-hidden
+            rounded-2xl border bg-card shadow-2xl
+            sm:fixed sm:left-auto sm:right-2 sm:top-14 sm:w-[22rem] sm:max-w-[calc(100vw-1rem)]
+            md:absolute md:right-0 md:top-full md:mt-2 md:w-80
+          "
         >
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
             <h3 className="text-sm font-semibold">Notificações</h3>
-            <div className="flex items-center gap-1">
+
+            <div className="flex shrink-0 items-center gap-1">
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllRead.mutate()}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={markAllRead.isPending}
                 >
                   <CheckCheck className="size-3" />
-                  Marcar todas como lidas
+                  <span className="hidden sm:inline">
+                    Marcar todas como lidas
+                  </span>
+                  <span className="sm:hidden">Ler todas</span>
                 </button>
               )}
             </div>
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-[calc(100vh-9rem)] overflow-y-auto md:max-h-80">
             {items.length === 0 && (
               <div className="flex flex-col items-center gap-2 px-4 py-8 text-muted-foreground">
                 <Bell className="size-8 opacity-30" />
@@ -132,6 +143,7 @@ export function NotificationBell() {
                 : "";
 
               const bodyText = typeof n.body === "string" ? n.body.trim() : "";
+              const titleText = String(n.title ?? "");
 
               return (
                 <div
@@ -147,13 +159,13 @@ export function NotificationBell() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <p
-                        className={`text-sm leading-snug ${
+                        className={`min-w-0 flex-1 break-words text-sm leading-snug ${
                           isUnread
                             ? "font-medium text-foreground"
                             : "text-muted-foreground"
                         }`}
                       >
-                        {String(n.title ?? "")}
+                        {titleText}
                       </p>
 
                       {isUnread && (
@@ -168,7 +180,7 @@ export function NotificationBell() {
                     </div>
 
                     {bodyText && (
-                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                      <p className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground">
                         {bodyText}
                       </p>
                     )}
