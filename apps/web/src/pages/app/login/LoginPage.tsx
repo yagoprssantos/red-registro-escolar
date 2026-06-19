@@ -74,7 +74,7 @@ function withProfile(pathname: string, profile: UserProfile) {
 }
 
 export default function LoginPage() {
-  const { isAuthenticated } = useAuth();
+  const { user, loading } = useAuth();
   const [, navigate] = useLocation();
 
   const pageParams = useMemo(
@@ -152,11 +152,17 @@ export default function LoginPage() {
     };
   }, [isOAuthFinalizing, isOAuthLoading]);
 
+  const hasValidUser = !!user?.id && !!user?.email;
+
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/dashboard");
+    if (loading) return;
+
+    if (!hasValidUser) {
+      return;
     }
-  }, [isAuthenticated, navigate]);
+
+    navigate("/dashboard");
+  }, [hasValidUser, loading, navigate]);
 
   useEffect(() => {
     sessionStorage.setItem("selectedProfile", selectedProfile);
