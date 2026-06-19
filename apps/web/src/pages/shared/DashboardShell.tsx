@@ -20,6 +20,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
   LogOut,
   School,
   Settings,
@@ -333,20 +334,24 @@ function MobileBottomNav({
   onSelect: (id: string) => void;
   onMoreClick: () => void;
 }) {
-  const primary = sections.slice(0, 4);
+  const leftSections = sections.slice(0, 2);
+  const rightSections = sections.slice(2, 4);
   const hasMore = sections.length > 4;
+  const moreActive =
+    hasMore && sections.slice(4).some(s => s.id === activeSection);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur md:hidden">
-      <div className="flex h-16 items-center justify-around">
-        {primary.map(section => {
+      <div className="relative flex h-16 items-center px-1">
+        {/* Left 2 tabs */}
+        {leftSections.map(section => {
           const Icon = section.icon;
           const isActive = activeSection === section.id;
           return (
             <button
               key={section.id}
               onClick={() => onSelect(section.id)}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-1.5 transition-colors ${
+              className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 py-1.5 transition-colors ${
                 isActive ? "text-red-brand" : "text-muted-foreground"
               }`}
               aria-current={isActive ? "page" : undefined}
@@ -355,26 +360,56 @@ function MobileBottomNav({
                 className={`size-5 transition-transform ${isActive ? "scale-110" : ""}`}
               />
               <span
-                className={`truncate font-body text-[10px] ${isActive ? "font-semibold" : ""}`}
+                className={`max-w-full truncate px-1 font-body text-[10px] ${
+                  isActive ? "font-semibold" : ""
+                }`}
               >
                 {section.title}
               </span>
             </button>
           );
         })}
+
+        {/* Center "Mais" button — prominent, brand-colored */}
         {hasMore && (
           <button
             onClick={onMoreClick}
-            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-1.5 transition-colors ${
-              sections.slice(4).some(s => s.id === activeSection)
-                ? "text-red-brand"
-                : "text-muted-foreground"
+            className={`relative -mt-4 flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full bg-red-brand font-semibold text-white shadow-lg shadow-red-brand/25 transition-transform active:scale-95 ${
+              moreActive ? "ring-2 ring-white/40" : ""
             }`}
+            aria-label="Mais seções"
           >
-            <Users className="size-5" />
-            <span className="truncate font-body text-[10px]">Mais</span>
+            <LayoutGrid className="size-5" />
+            <span className="font-body text-[9px] leading-none">Mais</span>
           </button>
         )}
+
+        {/* Right 2 tabs */}
+        {rightSections.map(section => {
+          const Icon = section.icon;
+          const isActive = activeSection === section.id;
+          return (
+            <button
+              key={section.id}
+              onClick={() => onSelect(section.id)}
+              className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 py-1.5 transition-colors ${
+                isActive ? "text-red-brand" : "text-muted-foreground"
+              }`}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <Icon
+                className={`size-5 transition-transform ${isActive ? "scale-110" : ""}`}
+              />
+              <span
+                className={`max-w-full truncate px-1 font-body text-[10px] ${
+                  isActive ? "font-semibold" : ""
+                }`}
+              >
+                {section.title}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
@@ -398,26 +433,35 @@ function MobileMoreDrawer({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 md:hidden"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 md:hidden"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           onClick={onClose}
         >
+          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+
+          {/* Dialog — centered, uniform, responsive */}
           <motion.div
-            className="absolute bottom-16 left-0 right-0 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 shadow-xl"
-            initial={{ y: 20 }}
-            animate={{ y: 0 }}
-            exit={{ y: 20 }}
-            transition={{ duration: 0.18 }}
+            className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl"
+            initial={{ y: 16, opacity: 0, scale: 0.97 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 16, opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             onClick={e => e.stopPropagation()}
           >
+            {/* Header */}
             <div className="mb-4 flex items-center justify-between">
-              <p className="font-body text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Todas as seções
-              </p>
+              <div>
+                <p className="font-body text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Navegação
+                </p>
+                <h2 className="font-heading text-lg font-semibold text-foreground">
+                  Todas as seções
+                </h2>
+              </div>
               <button
                 onClick={onClose}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted/50"
@@ -426,7 +470,9 @@ function MobileMoreDrawer({
                 <X size={15} />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+
+            {/* Sections grid — 3 columns, uniform cards */}
+            <div className="grid grid-cols-3 gap-2.5">
               {sections.map(section => {
                 const Icon = section.icon;
                 const isActive = activeSection === section.id;
@@ -437,13 +483,13 @@ function MobileMoreDrawer({
                       onSelect(section.id);
                       onClose();
                     }}
-                    className={`flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-all duration-200 ${
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center transition-all duration-200 ${
                       isActive
                         ? "border-red-brand bg-red-brand text-white shadow-md shadow-red-brand/10"
-                        : "border-border bg-card text-muted-foreground hover:bg-muted/50"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                     }`}
                   >
-                    <Icon className="size-5" />
+                    <Icon className="size-5 shrink-0" />
                     <span className="font-body text-xs leading-tight">
                       {section.title}
                     </span>

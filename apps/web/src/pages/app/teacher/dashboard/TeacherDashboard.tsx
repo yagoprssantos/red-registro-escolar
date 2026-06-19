@@ -287,17 +287,17 @@ export default function TeacherDashboard() {
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">
-                        {String(cls.name || cls.gradeLabel)}
+                        {String(cls.displayName || cls.gradeLabel || cls.name || `Turma ${cls.id}`)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {shiftLabel(cls.shift)} ·{" "}
-                        {String(cls.gradeLabel || "—")}
+                        {String(cls.subject || cls.gradeLabel || "—")}
                       </p>
                     </div>
                     <div className="ml-3 flex items-center gap-2">
                       <Users className="size-3 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">
-                        {String(cls.studentCount || "—")}
+                        {String(cls.students ?? "—")}
                       </span>
                       {hasSession ? (
                         <Badge
