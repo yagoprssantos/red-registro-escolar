@@ -123,7 +123,10 @@ export default function TeacherDashboard() {
       {/* ── Top stat cards ─────────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Total turmas */}
-        <Card>
+        <Card
+          className="cursor-pointer hover:bg-muted/30 transition-colors"
+          onClick={() => window.dispatchEvent(new CustomEvent("dashboard:navigate", { detail: "attendance" }))}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Minhas turmas</CardTitle>
             <Users className="size-4 text-muted-foreground" />
@@ -171,7 +174,10 @@ export default function TeacherDashboard() {
         </Card> */}
 
         {/* Últimas notas */}
-        <Card>
+        <Card
+          className="cursor-pointer hover:bg-muted/30 transition-colors"
+          onClick={() => window.dispatchEvent(new CustomEvent("dashboard:navigate", { detail: "grades" }))}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">
               Avaliações lançadas
@@ -188,9 +194,10 @@ export default function TeacherDashboard() {
 
         {/* Comunicados não lidos */}
         <Card
-          className={
+          className={`cursor-pointer hover:bg-muted/30 transition-colors ${
             notifList.length > 0 ? "border-amber-300 dark:border-amber-700" : ""
-          }
+          }`}
+          onClick={() => window.dispatchEvent(new CustomEvent("dashboard:navigate", { detail: "communications" }))}
         >
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">
@@ -219,7 +226,10 @@ export default function TeacherDashboard() {
 
       {/* ── Quick actions ───────────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <button className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("dashboard:navigate", { detail: "attendance" }))}
+          className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted cursor-pointer"
+        >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-950">
             <ClipboardList className="size-5" />
           </div>
@@ -232,18 +242,24 @@ export default function TeacherDashboard() {
             </p>
           </div>
         </button>
-        <button className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("dashboard:navigate", { detail: "grades" }))}
+          className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted cursor-pointer"
+        >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950">
             <BookOpenCheck className="size-5" />
           </div>
           <div>
-            <p className="text-sm font-medium">Lançar notas</p>
+            <p className="text-sm font-medium">Avaliações e Notas</p>
             <p className="text-xs text-muted-foreground">
               {assessmentList.length} avaliação(ões) recentes
             </p>
           </div>
         </button>
-        <button className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("dashboard:navigate", { detail: "comments" }))}
+          className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted cursor-pointer"
+        >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-950">
             <FileText className="size-5" />
           </div>

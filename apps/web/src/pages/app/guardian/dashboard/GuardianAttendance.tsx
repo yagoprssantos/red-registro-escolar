@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import {
   MAX_REGISTRY_LIMIT,
-  type Student,
   type ClassSession,
   type ClassSubject,
   type Teacher,
@@ -11,7 +10,9 @@ import {
   type StudentPerformance,
 } from "@/lib/registry-types";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect } from "react";
+import GuardianStudentCard from "../GuardianStudentCard";
+import { useGuardianStudent } from "../useGuardianStudent";
 
 type AttendanceEnrichedRow = {
   id: number;
@@ -24,11 +25,22 @@ type AttendanceEnrichedRow = {
 
 export default function GuardianAttendance() {
   const { data: students } = trpc.profiles.guardian.students.useQuery();
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(
-    null
-  );
+  const { selectedStudentId, setSelectedStudentId } = useGuardianStudent();
 
-  const studentList = (students ?? []) as Student[];
+  const studentList = (students ?? []) as Array<{
+    id: number;
+    name: string | null;
+    grade: string | null;
+    enrollmentNumber: string | null;
+    averageGrade: number;
+  }>;
+
+  // Auto-select first student
+  useEffect(() => {
+    if (studentList.length > 0 && selectedStudentId === null) {
+      setSelectedStudentId(studentList[0].id);
+    }
+  }, [studentList, selectedStudentId, setSelectedStudentId]);
 
   const { data: performance } =
     trpc.profiles.guardian.studentPerformance.useQuery(
@@ -100,25 +112,11 @@ export default function GuardianAttendance() {
   return (
     <div className="space-y-6">
       {/* Student selector */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium">Aluno:</label>
-        <select
-          value={selectedStudentId ?? ""}
-          onChange={e => setSelectedStudentId(Number(e.target.value) || null)}
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-        >
-          <option value="">Selecione...</option>
-          {studentList.map(s => (
-            <option key={String(s.id)} value={String(s.id)}>
-              {String(s.name)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        Diferença vs aluno: inclui nome do professor e botão Justificar
-      </p>
+      <GuardianStudentCard
+        students={studentList}
+        selectedStudentId={selectedStudentId}
+        onSelect={setSelectedStudentId}
+      />
 
       {!selectedStudentId && (
         <p className="text-sm text-muted-foreground">

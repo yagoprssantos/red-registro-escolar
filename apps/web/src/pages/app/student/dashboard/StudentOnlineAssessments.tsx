@@ -14,6 +14,8 @@ type TaskItem = {
   dueDate: string;
   maxScore: number;
   subjectName: string;
+  teacherName?: string | null;
+  closedAt?: string | null;
   submission: {
     id: number;
     answer: string | null;
@@ -25,35 +27,56 @@ type TaskItem = {
   } | null;
 };
 
-function AssessmentCard({ a, subjectName }: { a: RegistryRow; subjectName: string }) {
+function AssessmentCard({ a, subjectName, teacherName }: { a: RegistryRow; subjectName: string; teacherName?: string }) {
   const now = new Date().toISOString().split("T")[0];
   const deadline = String(a.assessmentDate ?? "");
   const isAvailable = deadline >= now;
+  const daysLeft = deadline
+    ? Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000)
+    : null;
 
   return (
-    <Card className={!isAvailable ? "opacity-60" : ""}>
-      <CardContent className="flex items-center justify-between py-4">
-        <div>
-          <h3 className="text-sm font-semibold">{String(a.title ?? "Avaliação")}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {subjectName} — Prazo:{" "}
-            {deadline ? new Date(deadline + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
-          </p>
+    <Card className={!isAvailable ? "opacity-70" : ""}>
+      <CardContent className="py-4 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold truncate">{String(a.title ?? "Avaliação")}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              <span className="font-medium text-foreground">{subjectName}</span>
+              {teacherName ? ` · Prof. ${teacherName}` : ""}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+              isAvailable ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {isAvailable ? <><Monitor className="size-3.5" /> Disponível</> : "Encerrada"}
+          </span>
         </div>
-        <span
-          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium ${
-            isAvailable ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"
-          }`}
-        >
-          {isAvailable ? (
-            <>
-              <Monitor className="size-4" />
-              Disponível
-            </>
-          ) : (
-            "Encerrada"
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <span>
+            📅 Data:{" "}
+            <span className="font-medium text-foreground">
+              {deadline ? new Date(deadline + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+            </span>
+          </span>
+          <span>
+            🎯 Valor:{" "}
+            <span className="font-medium text-foreground">{String(a.maxScore ?? 10)} pts</span>
+          </span>
+          {a.weight && (
+            <span>
+              ⚖️ Peso:{" "}
+              <span className="font-medium text-foreground">{String(a.weight)}</span>
+            </span>
           )}
-        </span>
+          {isAvailable && daysLeft !== null && (
+            <span className={daysLeft <= 3 ? "text-amber-600 font-semibold" : ""}>
+              ⏳ {daysLeft === 0 ? "Hoje!" : daysLeft === 1 ? "Amanhã" : `${daysLeft} dias restantes`}
+            </span>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -66,19 +89,22 @@ function TaskCard({ task, onSubmit }: { task: TaskItem; onSubmit: (taskId: numbe
   const isExpired = task.dueDate < now;
   const sub = task.submission;
 
+  const isClosed = !!task.closedAt && !sub;
   const statusLabel = sub?.gradedAt
     ? `Avaliado: ${sub.score}/${task.maxScore}`
     : sub?.submittedAt
       ? "Entregue (aguardando avaliação)"
-      : isExpired
-        ? "Prazo encerrado"
-        : "Pendente";
+      : isClosed
+        ? "Tarefa encerrada"
+        : isExpired
+          ? "Prazo encerrado"
+          : "Pendente";
 
   const statusColor = sub?.gradedAt
     ? "text-green-600"
     : sub?.submittedAt
       ? "text-amber-600"
-      : isExpired
+      : isClosed || isExpired
         ? "text-red-500"
         : "text-muted-foreground";
 
@@ -86,11 +112,24 @@ function TaskCard({ task, onSubmit }: { task: TaskItem; onSubmit: (taskId: numbe
     <Card>
       <CardContent className="py-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <div>
+          <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold">{task.title}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {task.subjectName} — Prazo: {new Date(task.dueDate + "T00:00:00").toLocaleDateString("pt-BR")}
+              <span className="font-medium text-foreground">{task.subjectName}</span>
+              {task.teacherName ? ` · Prof. ${task.teacherName}` : ""}
             </p>
+            <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
+              <span>
+                📅 Prazo:{" "}
+                <span className="font-medium text-foreground">
+                  {new Date(task.dueDate + "T00:00:00").toLocaleDateString("pt-BR")}
+                </span>
+              </span>
+              <span>
+                🎯 Valor:{" "}
+                <span className="font-medium text-foreground">{task.maxScore} pts</span>
+              </span>
+            </div>
           </div>
           <span className={`text-xs font-medium ${statusColor} shrink-0`}>
             {statusLabel}
@@ -107,7 +146,7 @@ function TaskCard({ task, onSubmit }: { task: TaskItem; onSubmit: (taskId: numbe
           </div>
         )}
 
-        {!sub && !isExpired && task.taskType === "atividade" && (
+        {!sub && !isExpired && !(task as TaskItem & { closedAt?: string | null }).closedAt && task.taskType === "atividade" && (
           <div className="space-y-2">
             {!expanded ? (
               <button
@@ -196,6 +235,7 @@ export default function StudentOnlineAssessments() {
 
   const allAssessments = (assessments ?? []) as RegistryRow[];
   const subjectsByCs = new Map((details?.subjects ?? []).map(s => [s.id, s.subjectName]));
+  const teachersByCs = new Map((details?.subjects ?? []).map(s => [s.id, s.teacherName ?? undefined]));
 
   const taskList = (tasksData ?? []) as TaskItem[];
   const trabalhos = taskList.filter(t => t.taskType === "trabalho");
@@ -253,6 +293,7 @@ export default function StudentOnlineAssessments() {
                 key={String(a.id)}
                 a={a}
                 subjectName={subjectsByCs.get(a.classSubjectId as number) ?? "—"}
+                teacherName={teachersByCs.get(a.classSubjectId as number)}
               />
             ))
           )}

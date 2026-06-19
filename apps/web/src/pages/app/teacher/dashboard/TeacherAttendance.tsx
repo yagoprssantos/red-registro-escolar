@@ -106,9 +106,10 @@ export default function TeacherAttendance() {
       });
       const sessionId = (sessionResult as RegistryRow)?.id as number;
 
-      // 2. Create attendance records
-      for (const [studentIdStr, status] of Object.entries(attendanceMap)) {
-        const studentId = Number(studentIdStr);
+      // 2. Create attendance records for all enrolled students (absent by default)
+      for (const student of enrolledStudents) {
+        const studentId = student.id as number;
+        const status = attendanceMap[studentId] ?? "absent";
         try {
           await attendanceCreate.mutateAsync({
             classSessionId: sessionId,
@@ -131,8 +132,10 @@ export default function TeacherAttendance() {
     }
   }
 
-  const presentCount = Object.values(attendanceMap).filter(s => s === "present").length;
-  const absentCount = Object.values(attendanceMap).filter(s => s === "absent").length;
+  const presentCount = enrolledStudents.filter(
+    s => (attendanceMap[s.id as number] ?? "absent") === "present"
+  ).length;
+  const absentCount = enrolledStudents.length - presentCount;
 
   return (
     <div className="space-y-6">
@@ -242,7 +245,7 @@ export default function TeacherAttendance() {
                   )}
                   <form onSubmit={handleSave} className="space-y-2">
                     {enrolledStudents.map(student => {
-                      const status = attendanceMap[student.id as number] ?? "present";
+                      const status = attendanceMap[student.id as number] ?? "absent";
                       return (
                         <button
                           key={String(student.id)}

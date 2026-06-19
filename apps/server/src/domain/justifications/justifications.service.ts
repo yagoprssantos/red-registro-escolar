@@ -113,11 +113,72 @@ export class JustificationsService {
     const filters: Record<string, string | number | boolean | null | undefined> = { schoolId };
     if (status) filters.status = status;
 
-    return await listEntityRows("absenceJustifications", {
+    const justifications = await listEntityRows("absenceJustifications", {
       filters,
       limit: 100,
       orderBy: "createdAt",
       orderDirection: "desc",
+    });
+
+    if (justifications.length === 0) return [];
+
+    // Collect IDs for batch fetching
+    const guardianIds = [...new Set(justifications.map(j => (j as Record<string, unknown>).guardianId as number).filter(Boolean))];
+    const arIds = [...new Set(justifications.map(j => (j as Record<string, unknown>).attendanceRecordId as number).filter(Boolean))];
+
+    const [guardians, attendanceRecords] = await Promise.all([
+      guardianIds.length > 0 ? listEntityRows("guardians", { filters: { id: guardianIds }, limit: guardianIds.length }) : [],
+      arIds.length > 0 ? listEntityRows("attendanceRecords", { filters: { id: arIds }, limit: arIds.length }) : [],
+    ]);
+
+    const studentIds = [...new Set(attendanceRecords.map(ar => (ar as Record<string, unknown>).studentId as number).filter(Boolean))];
+    const sessionIds = [...new Set(attendanceRecords.map(ar => (ar as Record<string, unknown>).classSessionId as number).filter(Boolean))];
+
+    const [students, sessions] = await Promise.all([
+      studentIds.length > 0 ? listEntityRows("students", { filters: { id: studentIds }, limit: studentIds.length }) : [],
+      sessionIds.length > 0 ? listEntityRows("classSessions", { filters: { id: sessionIds }, limit: sessionIds.length }) : [],
+    ]);
+
+    const teacherIds = [...new Set(sessions.map(s => (s as Record<string, unknown>).teacherId as number).filter(Boolean))];
+    const csIds = [...new Set(sessions.map(s => (s as Record<string, unknown>).classSubjectId as number).filter(Boolean))];
+
+    const [teachers, classSubjects] = await Promise.all([
+      teacherIds.length > 0 ? listEntityRows("teachers", { filters: { id: teacherIds }, limit: teacherIds.length }) : [],
+      csIds.length > 0 ? listEntityRows("classSubjects", { filters: { id: csIds }, limit: csIds.length }) : [],
+    ]);
+
+    const classIds = [...new Set(classSubjects.map(cs => (cs as Record<string, unknown>).classId as number).filter(Boolean))];
+    const classes = classIds.length > 0 ? await listEntityRows("classes", { filters: { id: classIds }, limit: classIds.length }) : [];
+
+    // Build lookup maps
+    type Row = Record<string, unknown>;
+    const guardianMap = new Map(guardians.map(g => [(g as Row).id, g as Row]));
+    const arMap = new Map(attendanceRecords.map(ar => [(ar as Row).id, ar as Row]));
+    const studentMap = new Map(students.map(s => [(s as Row).id, s as Row]));
+    const sessionMap = new Map(sessions.map(s => [(s as Row).id, s as Row]));
+    const teacherMap = new Map(teachers.map(t => [(t as Row).id, t as Row]));
+    const csMap = new Map(classSubjects.map(cs => [(cs as Row).id, cs as Row]));
+    const classMap = new Map(classes.map(c => [(c as Row).id, c as Row]));
+
+    return justifications.map(j => {
+      const jj = j as Row;
+      const guardian = guardianMap.get(jj.guardianId as number);
+      const ar = arMap.get(jj.attendanceRecordId as number);
+      const student = ar ? studentMap.get(ar.studentId as number) : undefined;
+      const session = ar ? sessionMap.get(ar.classSessionId as number) : undefined;
+      const teacher = session ? teacherMap.get(session.teacherId as number) : undefined;
+      const cs = session ? csMap.get(session.classSubjectId as number) : undefined;
+      const cls = cs ? classMap.get(cs.classId as number) : undefined;
+
+      return {
+        ...jj,
+        guardianName: guardian?.name ?? null,
+        studentName: student?.name ?? null,
+        lessonDate: session?.lessonDate ?? null,
+        teacherName: teacher?.name ?? null,
+        subjectName: cs?.subjectName ?? cs?.name ?? null,
+        className: cls ? `${cls.gradeLabel ? `${cls.gradeLabel} — ` : ""}${cls.name}` : null,
+      };
     });
   }
 

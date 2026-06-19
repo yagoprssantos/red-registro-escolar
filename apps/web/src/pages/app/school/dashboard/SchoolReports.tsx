@@ -6,6 +6,23 @@ import type { RegistryRow } from "@/pages/shared/Types";
 import { AlertTriangle, Download, GraduationCap, Search } from "lucide-react";
 import { useState } from "react";
 
+function formatClassName(cls: RegistryRow): string {
+  if (cls.displayName) return String(cls.displayName);
+  const grade = String(cls.gradeLabel || "").trim();
+  const course = String(cls.course || "").trim();
+  const name = String(cls.name || "").trim();
+  const gradeNum = parseInt(grade, 10);
+  const gradeStr =
+    !isNaN(gradeNum) && gradeNum > 0 && String(gradeNum) === grade
+      ? `${gradeNum}º Ano`
+      : grade;
+  if (gradeStr && course) return `${gradeStr} — ${course}`;
+  if (gradeStr && name && gradeStr.toLowerCase() !== name.toLowerCase())
+    return `${gradeStr} — ${name}`;
+  if (gradeStr) return gradeStr;
+  return name || `Turma ${cls.id}`;
+}
+
 type ReportTab = "frequency" | "performance" | "comments";
 
 const TABS: { value: ReportTab; label: string }[] = [
@@ -178,7 +195,7 @@ export default function SchoolReports() {
           <option value="all">Todas as turmas</option>
           {classList.map(cls => (
             <option key={String(cls.id)} value={String(cls.id)}>
-              {String(cls.name)}
+              {formatClassName(cls)}
             </option>
           ))}
         </select>

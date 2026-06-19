@@ -4,6 +4,23 @@ import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import type { RegistryRow } from "@/pages/shared/Types";
 import { CalendarClock, X } from "lucide-react";
+
+function formatClassName(cls: RegistryRow): string {
+  if (cls.displayName) return String(cls.displayName);
+  const grade = String(cls.gradeLabel || "").trim();
+  const course = String(cls.course || "").trim();
+  const name = String(cls.name || "").trim();
+  const gradeNum = parseInt(grade, 10);
+  const gradeStr =
+    !isNaN(gradeNum) && gradeNum > 0 && String(gradeNum) === grade
+      ? `${gradeNum}º Ano`
+      : grade;
+  if (gradeStr && course) return `${gradeStr} — ${course}`;
+  if (gradeStr && name && gradeStr.toLowerCase() !== name.toLowerCase())
+    return `${gradeStr} — ${name}`;
+  if (gradeStr) return gradeStr;
+  return name || `Turma ${cls.id}`;
+}
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -254,7 +271,7 @@ export default function SchoolEvents() {
                   <option value="">Selecione turma</option>
                   {classList.map(c => (
                     <option key={String(c.id)} value={String(c.id)}>
-                      {String(c.name)}
+                      {formatClassName(c)}
                     </option>
                   ))}
                 </select>
@@ -269,37 +286,44 @@ export default function SchoolEvents() {
       )}
 
       {Object.entries(grouped).map(([month, events]) => (
-        <div key={month}>
-          <h3 className="text-sm font-semibold mb-2">{month}</h3>
+        <div key={month} className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{month}</h3>
 
-          {events.map(event => (
-            <div key={String(event.id)} className="border p-3 rounded">
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-medium">{String(event.title)}</p>
-
-                  <span className="text-xs bg-gray-200 px-2 rounded">
-                    {EVENT_TYPE_BADGE[event.eventType as EventType] ??
-                      event.eventType}
-                  </span>
-
+          {events.map(event => {
+            const targetClass = getEventTargetClass(event.id as number);
+            return (
+              <div key={String(event.id)} className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm">
+                  {EVENT_TYPE_BADGE[event.eventType as EventType]?.split(" ")[0] ?? "📅"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium">{String(event.title)}</p>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {event.startsAt
+                        ? new Date(String(event.startsAt)).toLocaleDateString("pt-BR")
+                        : ""}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                      {EVENT_TYPE_BADGE[event.eventType as EventType]?.split(" ").slice(1).join(" ") ?? String(event.eventType)}
+                    </span>
+                    {targetClass && (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        {targetClass}
+                      </span>
+                    )}
+                  </div>
                   {event.description && (
-                    <p className="text-sm text-gray-500">
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
                       {String(event.description)}
                     </p>
                   )}
                 </div>
-
-                <span className="text-xs">
-                  {event.startsAt
-                    ? new Date(String(event.startsAt)).toLocaleDateString(
-                        "pt-BR"
-                      )
-                    : ""}
-                </span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ))}
     </div>

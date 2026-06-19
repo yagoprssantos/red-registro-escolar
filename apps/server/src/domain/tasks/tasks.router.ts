@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../../core/trpc";
-import { createEntityRow, listEntityRows, updateEntityRow, getStudentProfile, getTeacherProfile } from "../../db";
+import { createEntityRow, getEntityById, listEntityRows, updateEntityRow, getStudentProfile, getTeacherProfile } from "../../db";
 
 export const tasksRouter = router({
   // List tasks for the student's current class subjects
@@ -45,8 +45,20 @@ export const tasksRouter = router({
     const subjectIds = Array.from(
       new Set((classSubjects as Array<Record<string, unknown>>).map(cs => cs.subjectId as number))
     );
-    const subjects = subjectIds.length > 0
-      ? await listEntityRows("subjects", { filters: { id: subjectIds }, limit: subjectIds.length })
+    const [subjects, classTeachers] = await Promise.all([
+      subjectIds.length > 0
+        ? listEntityRows("subjects", { filters: { id: subjectIds }, limit: subjectIds.length })
+        : Promise.resolve([]),
+      csIds.length > 0
+        ? listEntityRows("classTeachers", { filters: { classSubjectId: csIds }, limit: csIds.length })
+        : Promise.resolve([]),
+    ]);
+
+    const teacherIds = Array.from(
+      new Set((classTeachers as Array<Record<string, unknown>>).map(ct => ct.teacherId as number))
+    );
+    const teachers = teacherIds.length > 0
+      ? await listEntityRows("teachers", { filters: { id: teacherIds }, limit: teacherIds.length })
       : [];
 
     const csMap = new Map(
@@ -55,6 +67,12 @@ export const tasksRouter = router({
     const subjectMap = new Map(
       (subjects as Array<Record<string, unknown>>).map(s => [s.id as number, s])
     );
+    const ctMap = new Map(
+      (classTeachers as Array<Record<string, unknown>>).map(ct => [ct.classSubjectId as number, ct])
+    );
+    const teacherMap = new Map(
+      (teachers as Array<Record<string, unknown>>).map(t => [t.id as number, t])
+    );
     const submissionMap = new Map(
       (submissions as Array<Record<string, unknown>>).map(s => [s.taskId as number, s])
     );
@@ -62,6 +80,8 @@ export const tasksRouter = router({
     return (tasks as Array<Record<string, unknown>>).map(task => {
       const cs = csMap.get(task.classSubjectId as number);
       const subject = cs ? subjectMap.get(cs.subjectId as number) : null;
+      const ct = ctMap.get(task.classSubjectId as number);
+      const teacher = ct ? teacherMap.get(ct.teacherId as number) : null;
       const submission = submissionMap.get(task.id as number) ?? null;
       return {
         id: task.id as number,
@@ -71,6 +91,8 @@ export const tasksRouter = router({
         dueDate: task.dueDate as string,
         maxScore: Number(task.maxScore ?? 10),
         subjectName: (subject?.name as string) ?? "—",
+        teacherName: (teacher?.name as string) ?? null,
+        closedAt: (task.closedAt as string | null) ?? null,
         submission: submission
           ? {
               id: (submission as Record<string, unknown>).id as number,
@@ -170,6 +192,36 @@ export const tasksRouter = router({
         feedback: input.feedback ?? null,
         gradedAt: new Date().toISOString(),
       });
+    }),
+
+  // Close a task — no more submissions accepted
+  close: protectedProcedure
+    .input(z.object({ taskId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não autenticado" });
+      const teacher = await getTeacherProfile(ctx.user.id);
+      if (!teacher) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a professores" });
+      const task = await getEntityById("tasks", input.taskId);
+      if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Tarefa não encontrada" });
+      const t = task as Record<string, unknown>;
+      if (t.teacherId !== (teacher as Record<string, unknown>).id)
+        throw new TRPCError({ code: "FORBIDDEN", message: "Você não é o professor desta tarefa" });
+      return await updateEntityRow("tasks", input.taskId, { closedAt: new Date().toISOString() });
+    }),
+
+  // Reopen a closed task
+  reopen: protectedProcedure
+    .input(z.object({ taskId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não autenticado" });
+      const teacher = await getTeacherProfile(ctx.user.id);
+      if (!teacher) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a professores" });
+      const task = await getEntityById("tasks", input.taskId);
+      if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Tarefa não encontrada" });
+      const t = task as Record<string, unknown>;
+      if (t.teacherId !== (teacher as Record<string, unknown>).id)
+        throw new TRPCError({ code: "FORBIDDEN", message: "Você não é o professor desta tarefa" });
+      return await updateEntityRow("tasks", input.taskId, { closedAt: null });
     }),
 
   // Create a task (teacher)

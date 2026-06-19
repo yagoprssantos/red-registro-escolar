@@ -542,6 +542,7 @@ type MemoryStore = {
     taskType: string;
     dueDate: string;
     maxScore: string;
+    closedAt: string | null;
     createdAt: Date;
     updatedAt: Date;
   }>;
@@ -1099,6 +1100,7 @@ const entityColumns: Record<RegistryEntityName, Set<string>> = {
     "taskType",
     "dueDate",
     "maxScore",
+    "closedAt",
     "createdAt",
     "updatedAt",
   ]),
@@ -2619,6 +2621,7 @@ export async function getGuardianProfile(userId: number) {
       name: guardian.name,
       email: guardian.email,
       relationship: guardian.relationship,
+      schoolId: guardian.schoolId,
       students: await getGuardianStudents(userId),
     };
   }
@@ -2629,6 +2632,7 @@ export async function getGuardianProfile(userId: number) {
     name: result.name,
     email: result.email,
     relationship: result.relationship,
+    schoolId: result.schoolId,
     students: await getGuardianStudents(userId),
   };
 }
@@ -2653,6 +2657,7 @@ export async function getGuardianStudents(userId: number) {
           id: student.id,
           name: student.name,
           grade: student.grade,
+          enrollmentNumber: student.enrollmentNumber ?? null,
           averageGrade: Number(avg.toFixed(2)),
         };
       })
@@ -2660,6 +2665,7 @@ export async function getGuardianStudents(userId: number) {
       id: number;
       name: string;
       grade: string | null;
+      enrollmentNumber: string | null;
       averageGrade: number;
     }>;
   }
@@ -2669,15 +2675,13 @@ export async function getGuardianStudents(userId: number) {
     p_user_id: userId,
   });
   if (error || !data) return [];
-  return (data as Record<string, unknown>[]).map(
-    row =>
-      row as unknown as {
-        id: number;
-        name: string;
-        grade: string | null;
-        averageGrade: number;
-      }
-  );
+  return (data as Record<string, unknown>[]).map(row => ({
+    id: row.id as number,
+    name: row.name as string,
+    grade: (row.grade ?? null) as string | null,
+    enrollmentNumber: ((row.enrollmentNumber ?? row.enrollmentnumber) ?? null) as string | null,
+    averageGrade: Number(row.averageGrade ?? row.averagegrade ?? 0),
+  }));
 }
 
 export async function getGuardianStudentPerformance(
@@ -3023,22 +3027,43 @@ export async function listDeletedEntityRows<E extends RegistryEntityName>(
 export async function getUserManagedSchoolIds(
   userId: number
 ): Promise<number[]> {
-  if (useMemoryStore())
-    return Array.from(
-      new Set(
-        memory.userSchools
-          .filter(link => link.userId === userId)
-          .map(link => link.schoolId)
-      )
-    );
+  if (useMemoryStore()) {
+    const fromUserSchools = memory.userSchools
+      .filter(link => link.userId === userId)
+      .map(link => link.schoolId);
+    if (fromUserSchools.length > 0)
+      return Array.from(new Set(fromUserSchools));
+    // Fallback: derive school from guardian or student profile
+    const guardianSchoolId = memory.guardians.find(g => g.userId === userId)?.schoolId;
+    if (guardianSchoolId) return [guardianSchoolId];
+    const studentSchoolId = memory.students.find(s => s.userId === userId)?.schoolId;
+    if (studentSchoolId) return [studentSchoolId];
+    return [];
+  }
   const supabase = getSupabase();
   if (!supabase) return [];
   const { data } = await supabase
     .from("userSchools")
     .select("schoolId")
     .eq("userId", userId);
-  if (!data) return [];
-  return Array.from(new Set(data.map(row => row.schoolId)));
+  if (data && data.length > 0)
+    return Array.from(new Set(data.map(row => row.schoolId)));
+  // Fallback: derive school from guardian or student profile
+  const { data: guardian } = await supabase
+    .from("guardians")
+    .select("schoolId")
+    .eq("userId", userId)
+    .limit(1)
+    .single();
+  if (guardian?.schoolId) return [guardian.schoolId];
+  const { data: student } = await supabase
+    .from("students")
+    .select("schoolId")
+    .eq("userId", userId)
+    .limit(1)
+    .single();
+  if (student?.schoolId) return [student.schoolId];
+  return [];
 }
 
 export async function userHasSchoolAccess(

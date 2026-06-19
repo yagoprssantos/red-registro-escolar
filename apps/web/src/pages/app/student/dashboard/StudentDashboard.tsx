@@ -177,7 +177,7 @@ export default function StudentDashboard() {
         </h1>
         <p className="font-body text-sm text-muted-foreground">
           {classInfo
-            ? `${me?.grade ?? ""} · ${classInfo.course ?? ""} · Turma ${classInfo.classCode}`
+            ? `${me?.grade ?? ""} · ${classInfo.course ?? ""}`
             : me?.grade
               ? `${me.grade} · ${me.school ?? ""}`
               : "Carregando..."}
@@ -212,7 +212,7 @@ export default function StudentDashboard() {
       ) : null}
 
       {/* Cards de métricas rápidas */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
         {/* Frequência */}
         <Card
           className={

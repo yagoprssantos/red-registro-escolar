@@ -47,7 +47,14 @@ export const schoolRouter = router({
 
       if (classIds.length === 0) return emptyResult;
 
-      // 2. Get classSubjects for those classes
+      // 2. Get enrollments (used both for attendance metric and at-risk students)
+      const enrollments = await listEntityRows("classEnrollments", {
+        filters: { classId: classIds },
+        limit: 2000,
+      });
+      const totalEnrolled = enrollments.length;
+
+      // 3. Get classSubjects for those classes
       const classSubjects = await listEntityRows("classSubjects", {
         filters: { classId: classIds },
         limit: 1000,
@@ -56,10 +63,9 @@ export const schoolRouter = router({
         (cs: Record<string, unknown>) => cs.id as number
       );
 
-      // 3. Attendance today — sessions for today filtered by school's classSubjects
+      // 4. Attendance today — sessions for today filtered by school's classSubjects
       let presentCount = 0;
       let absentCount = 0;
-      let totalExpected = 0;
 
       if (csIds.length > 0) {
         const sessions = await listEntityRows("classSessions", {
@@ -73,13 +79,17 @@ export const schoolRouter = router({
         if (sessionIds.length > 0) {
           const records = await listEntityRows("attendanceRecords", {
             filters: { classSessionId: sessionIds },
-            limit: 2000,
+            limit: 5000,
           });
+          const seenStudents = new Set<number>();
           for (const r of records) {
             const rr = r as Record<string, unknown>;
-            totalExpected++;
-            if (rr.status === "present") presentCount++;
-            else if (rr.status === "absent") absentCount++;
+            const sid = rr.studentId as number;
+            if (!seenStudents.has(sid)) {
+              seenStudents.add(sid);
+              if (rr.status === "present") presentCount++;
+              else if (rr.status === "absent") absentCount++;
+            }
           }
         }
       }
@@ -87,18 +97,14 @@ export const schoolRouter = router({
       const attendanceToday = {
         presentCount,
         absentCount,
-        totalExpected: totalExpected || 1,
+        totalExpected: totalEnrolled || 1,
         percentage:
-          totalExpected > 0
-            ? Math.round((presentCount / totalExpected) * 100)
+          totalEnrolled > 0
+            ? Math.round((presentCount / totalEnrolled) * 100)
             : 0,
       };
 
-      // 4. Students at risk — batch fetch enrollments and attendance
-      const enrollments = await listEntityRows("classEnrollments", {
-        filters: { classId: classIds, status: "ativo" },
-        limit: 500,
-      });
+      // 5. Students at risk — use enrollments already fetched above
 
       const studentIds = Array.from(
         new Set(
@@ -174,14 +180,14 @@ export const schoolRouter = router({
         }
       }
 
-      // 5. Pending justifications
+      // 6. Pending justifications
       const justifications = await listEntityRows("absenceJustifications", {
         filters: { schoolId: input.schoolId, status: "pending" },
         limit: 100,
       });
       const pendingJustifications = justifications.length;
 
-      // 6. Upcoming events
+      // 7. Upcoming events
       const events = await listEntityRows("schoolEvents", {
         filters: { schoolId: input.schoolId },
         limit: 10,

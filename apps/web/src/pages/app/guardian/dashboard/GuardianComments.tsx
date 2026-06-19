@@ -1,6 +1,8 @@
 import { trpc } from "@/lib/trpc";
-import type { Student, StudentComment } from "@/pages/shared/Types";
-import { useState } from "react";
+import type { StudentComment } from "@/pages/shared/Types";
+import { useEffect, useState } from "react";
+import GuardianStudentCard from "../GuardianStudentCard";
+import { useGuardianStudent } from "../useGuardianStudent";
 
 const CATEGORIES = [
   { value: "all", label: "Todos" },
@@ -17,12 +19,23 @@ type GuardianComment = StudentComment & {
 
 export default function GuardianComments() {
   const { data: students } = trpc.profiles.guardian.students.useQuery();
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(
-    null
-  );
+  const { selectedStudentId, setSelectedStudentId } = useGuardianStudent();
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
-  const studentList = (students ?? []) as Student[];
+  const studentList = (students ?? []) as Array<{
+    id: number;
+    name: string | null;
+    grade: string | null;
+    enrollmentNumber: string | null;
+    averageGrade: number;
+  }>;
+
+  // Auto-select first student
+  useEffect(() => {
+    if (studentList.length > 0 && selectedStudentId === null) {
+      setSelectedStudentId(studentList[0].id);
+    }
+  }, [studentList, selectedStudentId, setSelectedStudentId]);
 
   const { data: comments } = trpc.comments.forStudent.useQuery(
     { studentId: selectedStudentId! },
@@ -37,25 +50,12 @@ export default function GuardianComments() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium">Aluno:</label>
-        <select
-          value={selectedStudentId ?? ""}
-          onChange={e => setSelectedStudentId(Number(e.target.value) || null)}
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-        >
-          <option value="">Selecione...</option>
-          {studentList.map(s => (
-            <option key={String(s.id)} value={String(s.id)}>
-              {String(s.name)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        Diferença vs aluno: nome do professor <strong>VISÍVEL</strong>
-      </p>
+      {/* Student selector */}
+      <GuardianStudentCard
+        students={studentList}
+        selectedStudentId={selectedStudentId}
+        onSelect={setSelectedStudentId}
+      />
 
       <div className="flex flex-wrap gap-1">
         {CATEGORIES.map(cat => (

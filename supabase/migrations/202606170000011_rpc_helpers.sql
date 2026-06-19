@@ -187,18 +187,19 @@ RETURNS TABLE(
   id INTEGER,
   name VARCHAR,
   grade VARCHAR,
-  averageGrade NUMERIC
+  "enrollmentNumber" VARCHAR,
+  "averageGrade" NUMERIC
 )
 LANGUAGE sql STABLE
 AS $$
-  SELECT st.id, st.name, st.grade,
+  SELECT st.id, st.name, st.grade, st."enrollmentNumber",
     ROUND(COALESCE(AVG(ascore.score), 0), 2) AS "averageGrade"
   FROM guardians g
   JOIN "studentGuardians" sg ON sg."guardianId" = g.id
   JOIN students st ON st.id = sg."studentId"
   LEFT JOIN "assessmentScores" ascore ON ascore."studentId" = st.id
   WHERE g."userId" = p_user_id
-  GROUP BY st.id, st.name, st.grade;
+  GROUP BY st.id, st.name, st.grade, st."enrollmentNumber";
 $$;
 
 -- ── get_guardian_student_performance ─────────────────────────

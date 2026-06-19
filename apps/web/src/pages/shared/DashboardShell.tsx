@@ -544,6 +544,15 @@ export default function DashboardShell() {
   }, [loading, user, profile, navigate]);
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const sectionId = (e as CustomEvent<string>).detail;
+      if (sectionId) setActiveSection(sectionId);
+    };
+    window.addEventListener("dashboard:navigate", handler);
+    return () => window.removeEventListener("dashboard:navigate", handler);
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(
       "dashboard-sidebar-collapsed",
       isSidebarCollapsed ? "true" : "false"

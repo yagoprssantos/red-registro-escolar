@@ -7,6 +7,30 @@ import { ChevronRight, GraduationCap, Search, UserPlus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+const SHIFT_LABELS: Record<string, string> = {
+  morning: "Manhã",
+  afternoon: "Tarde",
+  evening: "Noite",
+  full_day: "Integral",
+};
+
+function formatClassName(cls: RegistryRow): string {
+  if (cls.displayName) return String(cls.displayName);
+  const grade = String(cls.gradeLabel || "").trim();
+  const course = String(cls.course || "").trim();
+  const name = String(cls.name || "").trim();
+  const gradeNum = parseInt(grade, 10);
+  const gradeStr =
+    !isNaN(gradeNum) && gradeNum > 0 && String(gradeNum) === grade
+      ? `${gradeNum}º Ano`
+      : grade;
+  if (gradeStr && course) return `${gradeStr} — ${course}`;
+  if (gradeStr && name && gradeStr.toLowerCase() !== name.toLowerCase())
+    return `${gradeStr} — ${name}`;
+  if (gradeStr) return gradeStr;
+  return name || `Turma ${cls.id}`;
+}
+
 export default function SchoolStudents() {
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
   const schoolId = mySchools?.[0]?.schoolId;
@@ -73,7 +97,10 @@ export default function SchoolStudents() {
     const enroll = enrollmentList.find(e => e.studentId === studentId);
     if (!enroll) return null;
     const cls = classList.find(c => c.id === enroll.classId);
-    return cls ? String(cls.name) : null;
+    if (!cls) return null;
+    const label = formatClassName(cls);
+    const shift = SHIFT_LABELS[String(cls.shift)] || String(cls.shift || "");
+    return shift ? `${label} · ${shift}` : label || null;
   }
 
   async function handleStudentSubmit(e: FormEvent) {
@@ -303,16 +330,8 @@ export default function SchoolStudents() {
                     </option>
                     {classList.map(cls => (
                       <option key={String(cls.id)} value={String(cls.id)}>
-                        {String(cls.name)} — {String(cls.gradeLabel || "")} ·{" "}
-                        {String(
-                          cls.shift === "morning"
-                            ? "Manhã"
-                            : cls.shift === "afternoon"
-                              ? "Tarde"
-                              : cls.shift === "evening"
-                                ? "Noite"
-                                : "Integral"
-                        )}
+                        {formatClassName(cls)}
+                        {cls.shift ? ` · ${SHIFT_LABELS[String(cls.shift)] || String(cls.shift)}` : ""}
                       </option>
                     ))}
                   </select>
@@ -326,11 +345,7 @@ export default function SchoolStudents() {
                   )}
                   {selectedClassId && (
                     <p className="text-xs text-muted-foreground">
-                      Turma:{" "}
-                      {String(
-                        classList.find(c => c.id === selectedClassId)?.name ??
-                          ""
-                      )}
+                      Turma: {formatClassName(classList.find(cl => cl.id === selectedClassId) ?? {} as RegistryRow)}
                     </p>
                   )}
                 </div>
@@ -426,11 +441,7 @@ export default function SchoolStudents() {
                   )}
                   {selectedClassId && (
                     <p className="text-xs text-muted-foreground">
-                      Turma:{" "}
-                      {String(
-                        classList.find(c => c.id === selectedClassId)?.name ??
-                          ""
-                      )}
+                      Turma: {formatClassName(classList.find(cl => cl.id === selectedClassId) ?? {} as RegistryRow)}
                     </p>
                   )}
                   {newGuardian.name && (

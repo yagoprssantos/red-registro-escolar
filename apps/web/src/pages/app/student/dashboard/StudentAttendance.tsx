@@ -1,22 +1,36 @@
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
+  Bell,
   ClipboardList,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const PE_DE_MEIA_THRESHOLD = 80;
 
 export default function StudentAttendance() {
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("");
+  const [requestedIds, setRequestedIds] = useState<Set<number>>(new Set());
 
   const { data: stats, isLoading: loadingStats } = trpc.profiles.student.attendance.useQuery();
   const { data: records, isLoading: loadingRecords } = trpc.profiles.student.attendanceDetail.useQuery();
+  const notifyGuardian = trpc.justifications.notifyGuardian.useMutation({
+    onSuccess: (data) => {
+      if (data.notified > 0) {
+        toast.success("Responsável notificado para justificar a falta.");
+      } else {
+        toast.info("Nenhum responsável vinculado para notificar.");
+      }
+    },
+    onError: () => toast.error("Não foi possível notificar o responsável."),
+  });
 
   if (loadingStats || loadingRecords) {
     return (
@@ -205,6 +219,7 @@ export default function StudentAttendance() {
         {filtered.map((r, i) => {
           const statusIcon =
             r.status === "present" ? "✅" : r.status === "justified" ? "📋" : "❌";
+          const alreadyRequested = requestedIds.has(r.id);
           return (
             <div
               key={i}
@@ -221,21 +236,38 @@ export default function StudentAttendance() {
                   </p>
                 </div>
               </div>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  r.status === "present"
-                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              <div className="flex items-center gap-2 shrink-0">
+                {r.status === "absent" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 text-xs dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                    disabled={alreadyRequested || notifyGuardian.isPending}
+                    onClick={() => {
+                      notifyGuardian.mutate({ attendanceRecordId: r.id });
+                      setRequestedIds(prev => new Set(prev).add(r.id));
+                    }}
+                  >
+                    <Bell className="size-3" />
+                    {alreadyRequested ? "Solicitado" : "Solicitar justificativa"}
+                  </Button>
+                )}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    r.status === "present"
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : r.status === "justified"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  }`}
+                >
+                  {r.status === "present"
+                    ? "Presente"
                     : r.status === "justified"
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                }`}
-              >
-                {r.status === "present"
-                  ? "Presente"
-                  : r.status === "justified"
-                    ? "Justificada"
-                    : "Falta"}
-              </span>
+                      ? "Justificada"
+                      : "Falta"}
+                </span>
+              </div>
             </div>
           );
         })}

@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Building2,
   CalendarClock,
   GraduationCap,
   MessageSquare,
@@ -40,6 +41,7 @@ const COMM_TYPE_LABEL: Record<string, string> = {
 export default function SchoolDashboard() {
   const { data: mySchools } = trpc.schools.mySchools.useQuery();
   const schoolId = mySchools?.[0]?.schoolId;
+  const schoolName = (mySchools?.[0] as any)?.school?.name as string | undefined;
 
   const { data: dashboard, isLoading, isError } = trpc.school.dashboard.useQuery(
     { schoolId: schoolId as number },
@@ -62,7 +64,7 @@ export default function SchoolDashboard() {
     { enabled: !!schoolId }
   );
 
-  const jList = justifications ?? [];
+  const jList = (justifications ?? []) as any[];
   const commList = comms ?? [];
 
   const utils = trpc.useUtils();
@@ -110,6 +112,17 @@ export default function SchoolDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* ── SCHOOL NAME HEADER ── */}
+      {schoolName && (
+        <div className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3">
+          <Building2 className="size-5 text-red-brand shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground">Escola administrada</p>
+            <p className="text-base font-semibold">{schoolName}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── METRICS ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

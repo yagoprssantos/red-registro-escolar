@@ -3,29 +3,50 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import type { RegistryRow } from "@/pages/shared/Types";
 import { CheckCircle, Clock, Upload, XCircle } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import GuardianStudentCard from "../GuardianStudentCard";
+import { useGuardianStudent } from "../useGuardianStudent";
 
 export default function GuardianJustify() {
+  const utils = trpc.useUtils();
   const { data: students } = trpc.profiles.guardian.students.useQuery();
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(
-    null
-  );
+  const { selectedStudentId, setSelectedStudentId } = useGuardianStudent();
   const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const [showForm, setShowForm] = useState(false);
 
-  const studentList = (students ?? []) as RegistryRow[];
+  const studentList = (students ?? []) as Array<{
+    id: number;
+    name: string | null;
+    grade: string | null;
+    enrollmentNumber: string | null;
+    averageGrade: number;
+  }>;
 
-  // Get attendance records for selected student to find absences
-  const { data: records } = trpc.registry.list.useQuery({
-    entity: "attendanceRecords" as const,
-    limit: 500,
-  });
-  const { data: sessions } = trpc.registry.list.useQuery({
-    entity: "classSessions" as const,
-    limit: 500,
-  });
+  // Auto-select first student
+  useEffect(() => {
+    if (studentList.length > 0 && selectedStudentId === null) {
+      setSelectedStudentId(studentList[0].id);
+    }
+  }, [studentList, selectedStudentId, setSelectedStudentId]);
+
+  // Get absent attendance records for selected student
+  const { data: records } = trpc.registry.list.useQuery(
+    {
+      entity: "attendanceRecords" as const,
+      filters: { studentId: selectedStudentId!, status: "absent" },
+      limit: 500,
+    },
+    { enabled: !!selectedStudentId }
+  );
+  const { data: sessions } = trpc.registry.list.useQuery(
+    {
+      entity: "classSessions" as const,
+      limit: 500,
+    },
+    { enabled: !!selectedStudentId }
+  );
   const { data: classSubjects } = trpc.registry.list.useQuery({
     entity: "classSubjects" as const,
     limit: 100,
@@ -40,25 +61,17 @@ export default function GuardianJustify() {
   const subjectList = (classSubjects ?? []) as RegistryRow[];
   const teacherList = (teachers ?? []) as RegistryRow[];
 
-  // Get existing justifications
-  const { data: justifications } = trpc.registry.list.useQuery({
-    entity: "absenceJustifications" as const,
-    limit: 100,
-  });
+  // Get guardian's own justifications
+  const { data: justifications } = trpc.justifications.listMine.useQuery();
 
   const justificationList = (justifications ?? []) as RegistryRow[];
   const justifiedRecordIds = new Set(
     justificationList.map(j => j.attendanceRecordId as number)
   );
 
-  // Filter absent records for selected student
+  // Filter out already justified records (server already filters by studentId + absent)
   const absentRecords = allRecords
-    .filter(
-      r =>
-        r.studentId === selectedStudentId &&
-        r.status === "absent" &&
-        !justifiedRecordIds.has(r.id as number)
-    )
+    .filter(r => !justifiedRecordIds.has(r.id as number))
     .map(r => {
       const session = sessionList.find(s => s.id === r.classSessionId);
       const subject = subjectList.find(s => s.id === session?.classSubjectId);
@@ -75,12 +88,14 @@ export default function GuardianJustify() {
 
   const justifyMutation = trpc.justifications.create.useMutation({
     onSuccess: () => {
-      toast.success("Justificativa enviada!");
+      toast.success("Justificativa enviada com sucesso!");
       setReason("");
       setSelectedRecordId(null);
       setShowForm(false);
+      void utils.justifications.listMine.invalidate();
+      void utils.registry.list.invalidate();
     },
-    onError: () => toast.error("Erro ao enviar justificativa"),
+    onError: (err) => toast.error(err.message || "Erro ao enviar justificativa"),
   });
 
   async function handleSubmit(e: FormEvent) {
@@ -98,25 +113,15 @@ export default function GuardianJustify() {
       <h2 className="text-lg font-semibold">Justificar Falta</h2>
 
       {/* Student selector */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium">Aluno:</label>
-        <select
-          value={selectedStudentId ?? ""}
-          onChange={e => {
-            setSelectedStudentId(Number(e.target.value) || null);
-            setShowForm(false);
-            setSelectedRecordId(null);
-          }}
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-        >
-          <option value="">Selecione...</option>
-          {studentList.map(s => (
-            <option key={String(s.id)} value={String(s.id)}>
-              {String(s.name)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <GuardianStudentCard
+        students={studentList}
+        selectedStudentId={selectedStudentId}
+        onSelect={id => {
+          setSelectedStudentId(id);
+          setShowForm(false);
+          setSelectedRecordId(null);
+        }}
+      />
 
       {/* Justify form (modal-like) */}
       {showForm && selectedRecordId && (

@@ -101,9 +101,11 @@ export default function StudentProfile() {
               {cls && (
                 <>
                   {" "}
-                  — Turma{" "}
+                  —{" "}
                   <span className="font-medium">
-                    {String(cls.name ?? cls.gradeLabel ?? "")}
+                    {[String(cls.gradeLabel || cls.name || ""), String(cls.course || "")]
+                      .filter(Boolean)
+                      .join(" — ")}
                   </span>
                 </>
               )}

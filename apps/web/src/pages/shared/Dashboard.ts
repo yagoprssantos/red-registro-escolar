@@ -10,7 +10,6 @@ import {
   FileText,
   GraduationCap,
   LayoutGrid,
-  Link2,
   Megaphone,
   MessageSquare,
   Monitor,
@@ -209,18 +208,6 @@ export const PROFILE_SECTIONS: Record<UserProfile, DashboardSection[]> = {
       icon: MessageSquare,
     },
     {
-      id: "communications",
-      title: "Comunicados",
-      description: "Avisos da escola.",
-      icon: Bell,
-    },
-    {
-      id: "events",
-      title: "Eventos",
-      description: "Calendário escolar.",
-      icon: CalendarClock,
-    },
-    {
       id: "justifications",
       title: "Justificativas",
       description: "Justificar faltas do filho.",
@@ -231,12 +218,6 @@ export const PROFILE_SECTIONS: Record<UserProfile, DashboardSection[]> = {
       title: "Notícias",
       description: "Novidades e reuniões.",
       icon: Megaphone,
-    },
-    {
-      id: "platforms",
-      title: "Plataformas",
-      description: "Links e acessos parceiros.",
-      icon: Link2,
     },
   ],
 };

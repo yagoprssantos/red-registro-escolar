@@ -151,6 +151,56 @@ export const justificationsRouter = router({
       return { success: true, justification: result };
     }),
 
+  // Student: notify guardian to submit justification
+  notifyGuardian: protectedProcedure
+    .input(z.object({ attendanceRecordId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não autenticado" });
+      }
+      try {
+        const { getEntityById, listEntityRows, createNotification } = await import("../../db");
+
+        const record = await getEntityById("attendanceRecords", input.attendanceRecordId);
+        if (!record) throw new TRPCError({ code: "NOT_FOUND", message: "Registro não encontrado" });
+
+        const r = record as Record<string, unknown>;
+        const studentId = r.studentId as number;
+        const student = await getEntityById("students", studentId);
+        const studentName = (student as Record<string, unknown>)?.name ?? "Aluno";
+
+        const session = await getEntityById("classSessions", r.classSessionId as number);
+        const sessionDate = session ? String((session as Record<string, unknown>).lessonDate ?? "") : "";
+        const dateStr = sessionDate
+          ? new Date(sessionDate + "T12:00:00").toLocaleDateString("pt-BR")
+          : "";
+
+        const links = await listEntityRows("studentGuardians", { filters: { studentId }, limit: 10 });
+        let notified = 0;
+        for (const link of links) {
+          const l = link as Record<string, unknown>;
+          const guardian = await getEntityById("guardians", l.guardianId as number);
+          if (guardian) {
+            const g = guardian as Record<string, unknown>;
+            if (g.userId) {
+              await createNotification({
+                userId: g.userId as number,
+                notificationType: "absence_alert",
+                title: "Solicitação de justificativa de falta",
+                body: `${studentName} solicita que você justifique uma falta${dateStr ? ` do dia ${dateStr}` : ""}. Acesse Frequência no portal do responsável para enviar a justificativa.`,
+                actionUrl: "/dashboard/frequencia",
+              });
+              notified++;
+            }
+          }
+        }
+        return { success: true, notified };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao notificar responsável" });
+      }
+    }),
+
   // Get justification by ID
   byId: protectedProcedure
     .input(z.object({ justificationId: z.number().int().positive() }))
